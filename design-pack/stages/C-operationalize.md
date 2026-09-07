@@ -36,9 +36,10 @@ as-is). Its statements are `[input]` by declaration. Before Step C1:
    `templates/scripts/unlock.sh` to `<target>/scripts/`; `templates/.doc-locks` to the target
    root; `templates/githooks/pre-commit`, `post-commit`, `pre-receive` and `README.md` to
    `<target>/.githooks/`. `chmod +x` the two scripts and the three hooks. Render
-   `templates/UNLOCKS.md` (no placeholders; strip the notes block). Add `.doc-unlock` to
-   `<target>/.gitignore`, creating that file if it does not exist: the unlock token is local
-   and single-use and is never committed.
+   `templates/UNLOCKS.md` (no placeholders; strip the notes block). Add `.doc-unlock` and
+   `__pycache__/` to `<target>/.gitignore`, creating that file if it does not exist: the unlock
+   token is local and single-use and is never committed, and `check-docs.py` imports
+   `eventlog.py`, so Python writes bytecode beside the scripts on the first run.
 3. Copy the log tooling, all unchanged: `templates/scripts/eventlog.py`, `log-append.py`,
    `rebuild-decisions.py`, `rebuild-questions.py` and `verify-chain.py` to `<target>/scripts/`;
    `chmod +x` the four tools. `eventlog.py` is a module rather than a tool: the three tools and `check-docs.py`

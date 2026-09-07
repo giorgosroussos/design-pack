@@ -11,7 +11,7 @@ No placeholders.
 | `seq` | 1-based, contiguous. A gap is a break. |
 | `ts` | ISO-8601 UTC, when the event was recorded |
 | `actor` | `agent` or `owner` |
-| `stream` | which stream the event belongs to (`decisions` today) |
+| `stream` | which stream the event belongs to: `decisions` or `questions` |
 | `type` | event type within the stream |
 | `payload` | the event's data, exactly the fields its projection renders |
 | `prev` | sha256 of the previous record's canonical form, 64 zeros at `seq` 1 |
@@ -28,8 +28,9 @@ A stream is a sequence of events about one thing. A projection is a file rendere
 | Stream | Projection | Rebuilt by |
 | --- | --- | --- |
 | `decisions` | `DECISIONS.md` | `scripts/rebuild-decisions.py` (`make rebuild-decisions`) |
+| `questions` | `QUESTIONS.md` | `scripts/rebuild-questions.py` (`make rebuild-questions`) |
 
-The projection is never authored. `make check-docs` renders it again and compares byte for byte (`projection-fresh`), so an edit made by hand in `DECISIONS.md` fails the gate instead of becoming the record. To change what a projection says, append an event.
+Both streams share this one file and one contiguous `seq`; each projection folds only the records of its own stream. A projection is never authored. `make check-docs` renders both again and compares byte for byte (`projection-fresh`), so an edit made by hand in `DECISIONS.md` or `QUESTIONS.md` fails the gate instead of becoming the record. To change what a projection says, append an event.
 
 ## What this guarantees, and what it does not
 
@@ -42,6 +43,7 @@ The projection is never authored. `make check-docs` renders it again and compare
 ```bash
 make verify-chain        # recompute every hash and link, naming the first break
 make rebuild-decisions   # render DECISIONS.md from the log
+make rebuild-questions   # render QUESTIONS.md from the log
 make check-docs          # includes chain-intact and projection-fresh
 ```
 

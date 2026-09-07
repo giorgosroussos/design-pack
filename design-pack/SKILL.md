@@ -138,6 +138,7 @@ raises it before that phase. Silent decision is the only unacceptable state.
 | `templates/log-README.md` | the log's own README: canonical form, and what the chain does not guarantee |
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |
+| `scripts/test-render.sh` | renders every template for a fixture product and proves the result passes the whole gate, the lock layer and `stage-detect` |
 | `scripts/extract-normative.py` | lists normative statements with provenance; used after every writing round and as hunter input |
 | `scripts/stage-detect.sh` | derives the stage from the target repository |
 

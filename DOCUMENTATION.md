@@ -484,10 +484,13 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 | `test-decisions-log.sh` | 15 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 31 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
 | `test-check-docs.sh` | 5 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity |
+| `test-render.sh` | 17 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit and the freeze promotion, and one broken red line failing the gate |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession
-exemption each fail a specific, named case.
+exemption each fail a specific, named case. The same holds for the templates: renaming the
+`## Commands` heading in `templates/AGENTS.md` or dropping a target from `templates/Makefile`
+fails `test-render.sh` with the `commands` rule named.
 
 ---
 

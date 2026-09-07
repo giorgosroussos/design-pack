@@ -24,14 +24,15 @@ This file is the state. There is no other tracker.
 - Every code change under `design-pack/templates/scripts/` or `design-pack/templates/githooks/`
   gets a case in the matching suite under `design-pack/scripts/test-*.sh`. A fix without a
   test is not `done`.
-- Run all three existing suites before closing any item; a regression anywhere reopens the
-  item that caused it.
+- Run every suite below before closing any item; a regression anywhere reopens the item that
+  caused it.
 
 ```
 bash design-pack/scripts/test-lock-guard.sh
 bash design-pack/scripts/test-decisions-log.sh
 bash design-pack/scripts/test-questions-log.sh
 bash design-pack/scripts/test-check-docs.sh
+bash design-pack/scripts/test-render.sh
 ```
 
 ## Summary board
@@ -39,7 +40,7 @@ bash design-pack/scripts/test-check-docs.sh
 | # | Item | Category | Est. | Status |
 | --- | --- | --- | --- | --- |
 | W1 | Mechanical bugs (A1–A8) | A — local fixes | ½ day | done |
-| W2 | Render-and-check acceptance suite | D — safety net | ½ day | not started |
+| W2 | Render-and-check acceptance suite | D — safety net | ½ day | done |
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | not started |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | not started |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | not started |
@@ -188,7 +189,7 @@ Acceptance:
 
 ## W2 — Render-and-check acceptance suite (safety net)
 
-Status: not started
+Status: done
 Decision: none needed.
 
 There is no test that the shipped templates, once rendered, pass `make check-docs`. That gate is
@@ -212,9 +213,9 @@ New file: `design-pack/scripts/test-render.sh`. In a throwaway directory:
    tools are byte-stable on a second run · the leakage greps of C4 steps 2–3 find nothing.
 
 Acceptance:
-- [ ] suite exists and passes on the current templates.
-- [ ] deliberately breaking one template (e.g. a red line without `§`) makes it fail.
-- [ ] added to `SKILL.md` "Files in this skill" and to `DOCUMENTATION.md` §11.
+- [x] suite exists and passes on the current templates.
+- [x] deliberately breaking one template (e.g. a red line without `§`) makes it fail.
+- [x] added to `SKILL.md` "Files in this skill" and to `DOCUMENTATION.md` §11.
 
 ---
 
@@ -448,3 +449,22 @@ Append-only. One entry per session per item touched. Form:
   U+2028 record → `verify-chain: intact`; `{{X}}` in Makefile → `FAIL markers Makefile:1`.
 - Left open: nothing. Note for W2: `test-check-docs.sh` is the rule-level suite; `test-render.sh`
   stays the whole-gate suite as planned.
+
+### 2026-09-08 — W2 — done
+- Changed: new `design-pack/scripts/test-render.sh` (17 cases): a Python renderer inside the
+  script strips `TEMPLATE NOTES`, drops the `<!-- if:API/UI -->` blocks, substitutes every
+  placeholder for a fixture product ("Ledgerette", no API, no UI, no contract-drift target) and
+  refuses to write a file that still carries `{{`; seeds the log from `decisions-seed.json` plus
+  one Resolved and one Open card; writes four domain specs the templates' citations resolve
+  against. Fixes found by building it: `stages/C-operationalize.md` C1.2 now also ignores
+  `__pycache__/` (the first commit of a rendered pack tracked `scripts/__pycache__/*.pyc`,
+  because `check-docs.py` imports `eventlog.py`); `templates/log-README.md` named only the
+  `decisions` stream and is now accurate for both. `SKILL.md` files table and
+  `DOCUMENTATION.md` §11 list the suite.
+- Proved by: `test-render.sh` 17/17 on the current templates; the rendered pack passes
+  `make check-docs` with 0 failures, 8 log records, both projections fresh, AGENTS.md 11 287
+  bytes. Mutations: renaming `## Commands` in `templates/AGENTS.md` → cases 1 and 6 fail with
+  `FAIL commands AGENTS.md: no `## Commands` section`; deleting the `rebuild-questions` target
+  from `templates/Makefile` → cases 1 and 6 fail naming `make rebuild-questions`. Both templates
+  restored from git afterwards. All five suites green: 14 + 15 + 31 + 5 + 17 = 82 cases.
+- Left open: nothing. W3 can now change the guard with this net under it.
