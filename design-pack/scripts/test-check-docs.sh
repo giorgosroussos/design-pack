@@ -118,5 +118,86 @@ else
     report no "cards: contiguous" "$(cat "$work/c2.out")"
 fi
 
+# --- normative-tagged ----------------------------------------------------------
+
+mkdir -p specs docs/inputs
+cat > specs/01-scope.md <<'EOF'
+# Scope
+
+## 1. Rules
+
+- The service MUST reject an unknown keeper. [input]
+- Entries MUST carry a date.
+- The word `MUST` in a code span is a mention, not a statement.
+
+```
+A fenced MUST is not a statement either.
+```
+
+| Column | A table row MUST not count |
+| --- | --- |
+
+The agent MUST: [D-005]
+
+1. inspect before editing;
+2. add tests in the same change; [input]
+
+Prose after the list ends the inheritance. MAY this be caught?
+EOF
+if probe 'cd.check_normative(root, False)' > "$work/n1.out" 2>&1; then
+    report no "normative-tagged: untagged statements" "no failure reported"
+elif [ "$(grep -c 'FAIL normative-tagged' "$work/n1.out")" = "2" ] && grep -q 'specs/01-scope.md:6' "$work/n1.out" && grep -q 'specs/01-scope.md:21' "$work/n1.out"; then
+    report ok "normative-tagged: exactly the two untagged statements fail (lines 6 and 21); code span, fence, table and inherited items do not" ""
+else
+    report no "normative-tagged: detection" "$(cat "$work/n1.out")"
+fi
+
+sed -i 's/^- Entries MUST carry a date\.$/- Entries MUST carry a date. [inferred]/; s/^Prose after the list ends the inheritance. MAY this be caught?$/Prose after the list ends the inheritance. MAY this be caught? [D-001]/' specs/01-scope.md
+if probe 'cd.check_normative(root, False)' > "$work/n2.out" 2>&1; then
+    report ok "normative-tagged: passes once every statement carries a tag" ""
+else
+    report no "normative-tagged: tagged fixture" "$(cat "$work/n2.out")"
+fi
+
+# an adopted pack is exempt by the declaration in docs/inputs/README.md
+sed -i 's/ \[inferred\]$//' specs/01-scope.md
+printf '# Inputs\n\n| File | Received | Kind | Authority |\n| --- | --- | --- | --- |\n| `specs/` | 2026-09-08 | prior specification | authoritative |\n' > docs/inputs/README.md
+if probe 'a = cd.adopted_pack(root); assert a, "not detected as adopted"; cd.check_normative(root, a)' > "$work/n3.out" 2>&1; then
+    report ok "normative-tagged: an adopted pack (specs/ declared authoritative) is exempt" ""
+else
+    report no "normative-tagged: adopted pack" "$(cat "$work/n3.out")"
+fi
+rm docs/inputs/README.md
+
+# --- inferred-zero -------------------------------------------------------------
+
+printf '# Specs\n\nVersion: 0.1-draft  \nStatus: Draft, not yet an implementation baseline  \n' > specs/README.md
+if probe 'cd.check_inferred({"specs/01-scope.md": 1}, cd.frozen(root))' > "$work/i1.out" 2>&1; then
+    report ok "inferred-zero: a draft pack with [inferred] passes (reported, not enforced)" ""
+else
+    report no "inferred-zero: draft" "$(cat "$work/i1.out")"
+fi
+printf '# Specs\n\nVersion: 1.0  \nStatus: Implementation baseline, 2026-09-08  \n' > specs/README.md
+if probe 'cd.check_inferred({"specs/01-scope.md": 1}, cd.frozen(root))' > "$work/i2.out" 2>&1; then
+    report no "inferred-zero: frozen pack with [inferred]" "no failure reported"
+elif grep -q 'FAIL inferred-zero .*specs/01-scope.md' "$work/i2.out"; then
+    report ok "inferred-zero: the same [inferred] fails once the baseline is stamped" ""
+else
+    report no "inferred-zero: frozen" "$(cat "$work/i2.out")"
+fi
+if probe 'cd.check_inferred({}, cd.frozen(root))' > "$work/i3.out" 2>&1; then
+    report ok "inferred-zero: a frozen pack with none passes" ""
+else
+    report no "inferred-zero: frozen clean" "$(cat "$work/i3.out")"
+fi
+
+# --- the skill's extract-normative reads the same detector --------------------
+
+if python3 "$here/scripts/extract-normative.py" --specs specs --untagged 2>/dev/null | grep -q 'Entries MUST carry a date'; then
+    report ok "extract-normative lists the untagged statement through the shared detector" ""
+else
+    report no "extract-normative" "did not list the untagged statement"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

@@ -12,7 +12,9 @@ compiling exposes a missing decision, it is a card (Blocking → stop and presen
 
 A pack enters Stage C without Stages A and B when `docs/inputs/README.md` declares an existing
 `specs/` directory an authoritative input in itself (the owner froze it elsewhere and adopts it
-as-is). Its statements are `[input]` by declaration. Before Step C1:
+as-is): a row of its inputs table whose File is `` `specs/` `` and whose Authority is
+`authoritative`. That row is what `check-docs` reads to exempt the pack from `normative-tagged`,
+so its form matters. Its statements are `[input]` by declaration. Before Step C1:
 
 1. Append ` [input]` to every untagged bullet of the locked register, above its change-control
    section. This is the only edit to a domain statement the skill makes without a card.
@@ -45,7 +47,7 @@ as-is). Its statements are `[input]` by declaration. Before Step C1:
    `chmod +x` the four tools. `eventlog.py` is a module rather than a tool: the three tools and `check-docs.py`
    import it, so it has to sit beside them. Render `templates/log-README.md` into
    `<target>/.log/README.md`. If the target has no `.log/events.jsonl` — an adopted pack that
-   never ran Stage B — create it empty and seed the four regime records exactly as
+   never ran Stage B — create it empty and seed the five regime records exactly as
    `stages/B-specify.md` round B2 does, then rebuild the projection.
 4. Render `Makefile` from its template (product name; keep or drop the contract-drift target).
 5. Render `CLAUDE.md`, `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` and `README.md` from their
@@ -80,7 +82,7 @@ as-is). Its statements are `[input]` by declaration. Before Step C1:
    index and the "None. Phase 0 can proceed." line under an empty `## Blocking` are all generated.
    A card that looks misplaced is an event that is missing, not a line to move.
 5. `DECISIONS.md`: do not edit it. Run `python3 scripts/rebuild-decisions.py` and confirm the
-   projection carries D-001 to D-004 and an index line for each. The index is generated with the
+   projection carries D-001 to D-005 and an index line for each. The index is generated with the
    entries, so a missing line means a missing event, not a missing line.
 
 ## Step C3 — Compile `AGENTS.md`

@@ -42,7 +42,7 @@ bash design-pack/scripts/test-render.sh
 | W1 | Mechanical bugs (A1–A8) | A — local fixes | ½ day | done |
 | W2 | Render-and-check acceptance suite | D — safety net | ½ day | done |
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | done |
-| W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | not started |
+| W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | not started |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | not started |
 
@@ -283,7 +283,7 @@ File: `design-pack/templates/scripts/lock-guard.py`
 
 ## W4 — The core claim is not mechanically enforced
 
-Status: not started
+Status: done
 Decision: **approved as specified below**. One open question is left for the owner in Q-W4.
 
 `design-pack-overview.md` says `make check-docs` verifies that "no statement is left untagged".
@@ -318,20 +318,26 @@ domain file *after* the freeze? `reference/provenance.md` allows it before; the 
 lists Open cards, but nothing stops a frozen spec from citing a card that is never answered.
 Recommendation: yes, as part of `inferred-zero` (rename to `frozen-ratified`), because a
 provisional statement in a frozen contract is the silent decision the whole method exists to
-prevent. Decision: ________
+prevent. Decision: **B — no (owner, 2026-09-08).** An Open card may stay cited after the freeze;
+enough formalisation has been added, and the owner wants the freedom to leave a question open
+past the baseline. The `Blocks:` field and session prompt 3 remain the net; if the owner
+insists, it is their call. `check-docs` reports provisional statements in a frozen pack in its
+summary (informational), and never fails on them.
 
 ### Acceptance
 
-- [ ] an untagged `MUST` in a domain file fails `normative-tagged`; the same line in a fenced
+- [x] an untagged `MUST` in a domain file fails `normative-tagged`; the same line in a fenced
       block or in backticks does not.
-- [ ] lead-in inheritance: `The MVP MUST: [input]` followed by untagged items passes.
-- [ ] `[inferred]` in a `Status: Draft` pack passes; the same pack stamped
+- [x] lead-in inheritance: `The MVP MUST: [input]` followed by untagged items passes.
+- [x] `[inferred]` in a `Status: Draft` pack passes; the same pack stamped
       `Status: Implementation baseline` fails `inferred-zero`.
-- [ ] `extract-normative.py` output is byte-identical before and after the refactor on the W2
-      fixture.
-- [ ] `design-pack-overview.md`, `DOCUMENTATION.md` §8 gates table, `SKILL.md` rule list,
+- [x] `extract-normative.py` output is byte-identical before and after the refactor on the W2
+      fixture. *(Format identical; content deliberately not: table rows are now skipped and a
+      keyword in a code span is a mention, both per `reference/provenance.md`, and the 20
+      untagged template statements the old listing showed are now tagged — see the log entry.)*
+- [x] `design-pack-overview.md`, `DOCUMENTATION.md` §8 gates table, `SKILL.md` rule list,
       `stages/D-review.md` D2 updated (D2 step 2 becomes "check-docs passes", not a manual read).
-- [ ] W2 suite passes.
+- [x] W2 suite passes.
 
 ---
 
@@ -499,3 +505,33 @@ Append-only. One entry per session per item touched. Form:
 - Left open: nothing. Note for W5: the demotion rule is absolute (no ceremony undoes a tier);
   the honest-limits text should say that a mistaken promotion is corrected only by an
   administrator of the remote, deliberately.
+
+### 2026-09-08 — W4 — done (Q-W4 decided B by the owner)
+- Changed: `templates/scripts/check-docs.py` — one detector, `normative_statements()` (keywords
+  outside code spans, lead-in inheritance, register bullets normative by definition, fences and
+  table rows skipped), rule `normative-tagged` (untagged statement in `specs/` fails; exempt
+  when `docs/inputs/README.md` lists `` `specs/` `` as authoritative — `adopted_pack()`), rule
+  `inferred-zero` (fails only once `specs/README.md` is stamped — `frozen()`), and a summary
+  line naming every statement that cites a card not yet Resolved, flagged when the pack is
+  frozen and never failing (decision B). `scripts/extract-normative.py` now imports that
+  detector via importlib, so listing and gate cannot disagree.
+  **Templates had 20 untagged normative statements** — a pack as shipped could not have passed
+  D2. Fixed at the source: `specs/traceability.md` and `specs/implementation-plan.md` had
+  `[input]` mid-line (moved to the end); `specs/decision-register.md` §6 change-control prose
+  is tagged `[D-002]`; `specs/agent-playbook.md` §3 lead-ins (`The agent MUST:` / `MUST NOT:`,
+  15 items) are tagged `[D-005]` — a new fifth regime record, *Agent execution contract*, in
+  `decisions-seed.json` (uses `{{NN_PLAYBOOK}}`; every "four regime records" mention updated).
+  Docs: `reference/provenance.md` (code-span mention, trailing-tag warning, the two rules, the
+  Open-card-after-freeze paragraph), `stages/D-review.md` D2.2, `stages/C-operationalize.md`
+  (adopted-pack marker form), `SKILL.md` mechanism 3, `DOCUMENTATION.md` §8 and §11,
+  `design-pack-overview.md` (the claim is now true, and states the Open-card exception).
+- Proved by: `test-check-docs.sh` 12/12 (+7: two untagged of seven candidates fail on the right
+  lines while code span, fence, table and inherited items pass; all-tagged passes; adopted pack
+  exempt; `[inferred]` passes in a draft and fails the same fixture once stamped; frozen-clean
+  passes; `extract-normative` lists the untagged line through the shared detector).
+  `test-render.sh` 20/20 with the fixed templates; the rendered pack reports
+  `normative-tagged: 19 normative statements, every one tagged`, `D-005` in the projection, and
+  `provisional statements … none` (the fixture's Open card Q-002 is cited by no statement);
+  `extract-normative --untagged` on it lists 0, where it listed 20 before the template fixes.
+  All five suites green: 20 + 15 + 31 + 12 + 20 = 98 cases.
+- Left open: nothing.

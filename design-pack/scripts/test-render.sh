@@ -3,7 +3,7 @@
 #
 # Renders every template with the placeholder values of a small fixture product,
 # following stages/C-operationalize.md Step C1 and the truthful-empty state of
-# Step C2, seeds the log with the four regime records and two cards, writes the
+# Step C2, seeds the log with the five regime records and two cards, writes the
 # smallest specs/ set the templates' cross-references resolve against, then
 # asserts that the result is a pack `make check-docs` accepts. The rule-level
 # suite is test-check-docs.sh; this one proves the templates and the gate agree.
@@ -312,7 +312,7 @@ for name, body in specs.items():
 PYEOF
 [ $? -eq 0 ] || { printf '  FAIL  render: a template still carried a placeholder (see above)\n'; exit 1; }
 
-# --- the log: four regime records, two cards -----------------------------------
+# --- the log: five regime records, two cards -----------------------------------
 
 : > .log/events.jsonl
 append() { python3 scripts/log-append.py --quiet "$@" || { printf '  FAIL  seed: log-append refused %s\n' "$*"; exit 1; }; }
@@ -321,7 +321,7 @@ DATE=2026-09-08
 python3 - "$tpl/decisions-seed.json" <<'PYEOF' > "$work/seed.jsonl"
 import json, sys
 seed = json.load(open(sys.argv[1], encoding="utf-8"))
-values = {"{{DATE}}": "2026-09-08", "{{NN_TRACE}}": "05", "{{NN_REGISTER}}": "06", "{{NN_PLAN}}": "07",
+values = {"{{DATE}}": "2026-09-08", "{{NN_TRACE}}": "05", "{{NN_REGISTER}}": "06", "{{NN_PLAN}}": "07", "{{NN_PLAYBOOK}}": "08",
           "{{REGISTER_CC_SECTION}}": "6",
           "{{D003_DECISION}}": "No non-authoritative input was received. Any mockup, competitor reference or prior draft added later receives an authority row in docs/inputs/README.md and a superseding entry before an agent may use it.",
           "{{D003_WHY}}": "an input without a declared authority level becomes a requirements source by default, silently.",

@@ -17,4 +17,4 @@ This matrix maps the commercial and product intent in `docs/inputs/` to the spec
 
 ## Coverage rule
 
-Any future commercial promise MUST be added here before implementation and classified as MVP, Future or Out of Scope. [input] A code change alone does not change product scope.
+Any future commercial promise MUST be added here before implementation and classified as MVP, Future or Out of Scope; a code change alone does not change product scope. [input]

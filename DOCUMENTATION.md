@@ -418,6 +418,8 @@ standard library, and it runs before any code exists.
 | `decisions` | D-IDs monotonic and contiguous, required fields present, ADRs carry approval, index matches |
 | `register` | the locked register carries only `[input]` or resolved `[Q-NNN]` |
 | `provenance` | every tag resolves; every resolved card is cited, unless superseded, in which case its successor must exist |
+| `normative-tagged` | every normative statement in `specs/` ends with a provenance tag (adopted packs exempt by declaration) |
+| `inferred-zero` | once the baseline is stamped, no `[inferred]` remains in `specs/`; before it, reported only |
 | `cards` | every open card has all six fields and a valid surface |
 | `chain-intact` | every hash recomputes, every `prev` links, `seq` is contiguous from 1 |
 | `projection-fresh` | `DECISIONS.md` and `QUESTIONS.md` equal a fresh rebuild, byte for byte |
@@ -476,7 +478,7 @@ what no script can check.
 | `templates/scripts/log-append.py`, `verify-chain.py`, `rebuild-decisions.py`, `rebuild-questions.py` | the only writer, the chain check, the two rebuilds |
 | `templates/scripts/check-docs.py`, `lock-guard.py`, `unlock.sh` | the gates and the ceremony, copied verbatim |
 | `templates/githooks/`, `templates/.doc-locks`, `templates/UNLOCKS.md`, `templates/log-README.md` | the enforcement layer's assets |
-| `templates/decisions-seed.json` | the four regime records a fresh log starts with |
+| `templates/decisions-seed.json` | the five regime records a fresh log starts with |
 | `scripts/extract-normative.py`, `scripts/stage-detect.sh` | the mechanical passes |
 | `scripts/test-lock-guard.sh`, `test-decisions-log.sh`, `test-questions-log.sh` | the acceptance suites |
 
@@ -491,7 +493,7 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 | `test-lock-guard.sh` | 20 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
 | `test-decisions-log.sh` | 15 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 31 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
-| `test-check-docs.sh` | 5 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity |
+| `test-check-docs.sh` | 12 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
 | `test-render.sh` | 20 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, and one broken red line failing the gate |
 
 They are worth running against a mutation, not only against the current code: disabling the hash

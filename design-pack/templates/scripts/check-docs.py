@@ -30,6 +30,16 @@ Rules
                 resolves to a decision; every Resolved card is cited somewhere,
                 unless it was superseded, in which case its successor carries the
                 citation and has to exist
+  normative-tagged
+                every normative statement in `specs/` (MUST, MUST NOT, SHALL,
+                SHOULD, MAY outside code spans; the items under a lead-in that
+                ends with the keyword and a colon; every bullet of the locked
+                register) ends with a provenance tag. An adopted pack, one whose
+                `docs/inputs/README.md` lists `specs/` itself as an authoritative
+                input, is exempt: its statements are `[input]` by declaration
+  inferred-zero once `specs/README.md` is stamped `Status: Implementation baseline`,
+                no `[inferred]` statement remains in `specs/`; before the stamp the
+                count is reported and not enforced
   cards         every open card has Surface, Source, Question, Options,
                 Recommendation and Blocks; Surface is one of the five values
   chain-intact  the event log's hash chain verifies: every hash recomputes,
@@ -46,7 +56,9 @@ Rules
                 documents or in the root Makefile
 
 The report at the end (cards per surface, `[inferred]` statements per file,
-open gaps) is informational; only FAIL lines set the exit code.
+statements that cite a card still Open, open gaps) is informational; only FAIL
+lines set the exit code. A frozen pack may cite an Open card: that is a deliberate
+deferral the owner chose, and the summary names it rather than failing on it.
 """
 
 import argparse
@@ -75,6 +87,12 @@ PHASE_RE = re.compile(r"\bPhase (\d+)")
 Q_TAG_RE = re.compile(r"\[(?:[^\]]*?,\s*)?(Q-\d{3})[^\]]*\]")
 D_TAG_RE = re.compile(r"\[(D-\d{3})\]")
 INFERRED_RE = re.compile(r"(?<!`)\[inferred\](?!`)")  # a quoted `[inferred]` in prose is not a tag
+KEYWORD_RE = re.compile(r"\b(MUST NOT|MUST|SHALL NOT|SHALL|SHOULD NOT|SHOULD|MAY)\b")
+LEADIN_RE = re.compile(r"\b(MUST NOT|MUST|SHALL|SHOULD|MAY)\s*:\s*$")
+PROVENANCE_RE = re.compile(r"\[((?:input|inferred|Q-\d{3}|D-\d{3})(?:[^\]]*))\]\s*$")
+SPEC_HEADING_RE = re.compile(r"^(#{2,4})\s+(\d+(?:\.\d+)*)\.?\s+(.*)$")
+CODE_SPAN_RE = re.compile(r"`[^`]*`")
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S")
 FILE_TOKEN_RE = re.compile(r"`(?:specs/)?(\d{2})(?:-[a-z0-9-]+\.md)?`|`(?:specs/)?(README\.md)`")
 SEC_NUM_RE = re.compile(r"§(\d+(?:\.\d+)?)(?:[–-](\d+))?")
 
@@ -442,6 +460,128 @@ def check_cards(cards):
     return per_surface
 
 
+# --- normative statements ----------------------------------------------------
+
+def provenance_of(line):
+    """The primary tag of a trailing `[...]`, or None when the line carries none."""
+    m = PROVENANCE_RE.search(line.rstrip())
+    return m.group(1).split(",")[0].strip() if m else None
+
+
+def normative_statements(text, is_register=False):
+    """Yield (line, section, tag, statement) for every normative statement in a spec.
+
+    A statement is normative when it carries MUST, MUST NOT, SHALL, SHALL NOT,
+    SHOULD, SHOULD NOT or MAY outside a code span, so a quoted `MUST` in prose
+    is not one. A lead-in ending with the keyword and a colon makes the list
+    items that follow normative as well, up to the first line that is neither
+    an item nor blank; an item without a tag of its own inherits the lead-in's.
+    In the locked register every bullet above the change-control section is
+    normative by definition. Fenced code and table rows are skipped; the
+    provenance rule keeps tables non-normative. This is the one detector: the
+    skill's `extract-normative` imports it, so the listing an author reads and
+    the assertion the gate enforces cannot disagree.
+    """
+    section, fenced, inherit = "-", False, None
+    for ln, line in enumerate(text.splitlines(), 1):
+        if line.strip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        hm = SPEC_HEADING_RE.match(line)
+        if hm:
+            section, inherit = hm.group(2), None
+            if is_register and "change control" in hm.group(3).lower():
+                section = "change-control"
+            continue
+        if not line.strip():
+            continue
+        if line.lstrip().startswith("|"):
+            continue
+        is_item = bool(LIST_ITEM_RE.match(line))
+        if inherit is not None and not is_item:
+            inherit = None
+        normative = bool(KEYWORD_RE.search(CODE_SPAN_RE.sub("", line)))
+        if is_register and is_item and section != "change-control":
+            normative = True
+        tag = provenance_of(line)
+        if inherit is not None and is_item:
+            normative = True
+            if tag is None:
+                tag = inherit
+        if LEADIN_RE.search(CODE_SPAN_RE.sub("", line).strip()):
+            inherit = tag if tag is not None else "(none)"
+        if not normative:
+            continue
+        if tag == "(none)":
+            tag = None
+        statement = re.sub(r"\s+", " ", PROVENANCE_RE.sub("", line).strip(" -*"))
+        yield ln, section, tag, statement
+
+
+def adopted_pack(root):
+    """True when docs/inputs/README.md lists `specs/` itself as an authoritative input."""
+    path = os.path.join(root, "docs", "inputs", "README.md")
+    if not exists(path):
+        return False
+    for line in read(path).splitlines():
+        m = re.match(r"^\|\s*`?specs/?`?\s*\|(.*)\|\s*$", line)
+        if m and "authoritative" in m.group(1).lower():
+            return True
+    return False
+
+
+def frozen(root):
+    """True once specs/README.md carries the implementation-baseline stamp."""
+    readme = os.path.join(root, SPECS_DIR, "README.md")
+    return exists(readme) and re.search(r"^Status:\s*Implementation baseline", read(readme), re.M) is not None
+
+
+def check_normative(root, adopted):
+    total, untagged = 0, 0
+    for p in spec_files(root):
+        rel = os.path.relpath(p, root)
+        is_register = os.path.basename(p).endswith("-decision-register.md")
+        for ln, section, tag, statement in normative_statements(read(p), is_register):
+            total += 1
+            if tag is None:
+                untagged += 1
+                if not adopted:
+                    fail("normative-tagged", "%s:%d" % (rel, ln),
+                         "normative statement carries no provenance tag: %s" % statement[:80])
+    if adopted:
+        ok("normative-tagged", "%d normative statements; %d untagged are [input] by declaration (adopted pack)"
+           % (total, untagged))
+    else:
+        ok("normative-tagged", "%d normative statements, every one tagged" % total)
+    return total
+
+
+def check_inferred(inferred, is_frozen):
+    total = sum(inferred.values())
+    if is_frozen:
+        for rel, n in sorted(inferred.items()):
+            fail("inferred-zero", rel, "%d `[inferred]` statement(s) remain in a frozen pack; each becomes "
+                                       "a card (surface touched) or a D-NNN (not touched)" % n)
+        if not total:
+            ok("inferred-zero", "frozen pack, no [inferred] statement")
+    else:
+        ok("inferred-zero", "not frozen; %d [inferred] statement(s) reported, not enforced" % total)
+
+
+def provisional_citations(root, specs, cards):
+    """(file, line, card) for every spec statement citing a card that is not Resolved."""
+    out = []
+    for p in specs:
+        rel = os.path.relpath(p, root)
+        for ln, line in enumerate(read(p).splitlines(), 1):
+            for q in Q_TAG_RE.findall(line):
+                if q in cards and cards[q][0] in ("Blocking", "Open"):
+                    out.append((rel, ln, q))
+    return out
+
+
 # --- register / provenance ---------------------------------------------------
 
 def check_register(root, resolved):
@@ -637,6 +777,10 @@ def main():
     per_surface = check_cards(cards)
     check_register(root, resolved)
     inferred = check_provenance(root, all_docs, cards, resolved, dids, superseded)
+    is_frozen = frozen(root)
+    check_normative(root, adopted_pack(root))
+    check_inferred(inferred, is_frozen)
+    provisional = provisional_citations(root, specs, cards)
     check_agents(root)
     events, chain_ok = check_log(root)
     makefile = os.path.join(root, "Makefile")
@@ -652,6 +796,12 @@ def main():
     print("cards per surface (open/resolved): " + ", ".join(
         "%s %d/%d" % (s, per_surface[s][0], per_surface[s][1]) for s in ["data", "security", "scope", "external", "ux"]))
     print("[inferred] statements in specs: %s" % (", ".join("%s %d" % kv for kv in sorted(inferred.items())) or "none"))
+    if provisional:
+        print("provisional statements (citing a card not yet Resolved)%s: %s" % (
+            " in a FROZEN pack, a deliberate deferral" if is_frozen else "",
+            ", ".join("%s:%d %s" % x for x in provisional)))
+    else:
+        print("provisional statements (citing a card not yet Resolved): none")
     print("open gaps: %d" % gaps)
     print("event log: %d record(s), chain %s" % (events, "intact" if chain_ok else "BROKEN"))
     return 1 if failures else 0

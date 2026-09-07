@@ -1,5 +1,6 @@
 <!-- TEMPLATE NOTES (delete this block when rendering)
-Near-verbatim template. Change only the placeholders and the two conditional blocks.
+Near-verbatim template. Change only the placeholders and the two conditional blocks. The two
+lead-ins of section 3 carry [D-005], the agent execution contract; their items inherit it.
   {{ISOLATION_AXIS}}        the boundary tests must cross ("tenant/property"); if none, render the
                             isolation bullets as "data-ownership" checks and keep them
   {{EXCLUDED_CAPABILITIES}} the register's excluded list, comma-separated ("AI, PMS, payment, Kubernetes")
@@ -33,7 +34,7 @@ Do not give every agent the whole project unless the task is architectural revie
 
 ## 3. Agent execution contract
 
-The agent MUST:
+The agent MUST: [D-005]
 
 1. inspect current code and tests before editing;
 2. restate assumptions and flag conflicts with locked decisions;
@@ -43,7 +44,7 @@ The agent MUST:
 6. update {{CONTRACT_ARTIFACTS}} and docs when contracts change;
 7. report changed behavior, migration and rollback implications and remaining risks.
 
-The agent MUST NOT:
+The agent MUST NOT: [D-005]
 
 - change product scope or locked decisions;
 - introduce {{EXCLUDED_CAPABILITIES}} or any other excluded capability;

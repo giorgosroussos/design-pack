@@ -87,4 +87,6 @@ Each lane uses a branch or worktree and integrates through small reviewed merges
 
 ## {{N_BACKLOG}}. Backlog discipline
 
-Each ticket MUST include spec references, dependency and allowed file surface, contract and schema impact, acceptance tests and explicit exclusions. [input] If a ticket reveals a locked-decision conflict, stop and create an ADR; do not improvise a redesign.
+Each ticket MUST include spec references, dependency and allowed file surface, contract and schema impact, acceptance tests and explicit exclusions. [input]
+
+If a ticket reveals a locked-decision conflict, stop and create an ADR; do not improvise a redesign.

@@ -3,13 +3,13 @@
 extract-normative: list every normative statement in a spec directory with its
 file, section and provenance tag.
 
-    python3 extract-normative.py [--specs DIR] [--untagged] [--format tsv|md]
+    python3 extract-normative.py [--specs DIR] [--untagged] [--untagged-as TAG] [--format tsv|md]
 
-A statement is normative when it contains MUST, MUST NOT, SHALL, SHOULD,
-SHOULD NOT or MAY in capitals. A lead-in line ending with `MUST:` (or another
-keyword and a colon) makes every list item that follows, up to the next blank
-line, normative as well. The provenance tag is the trailing `[...]` on the
-statement line, or on the lead-in line for inherited items.
+A statement is normative when it contains MUST, MUST NOT, SHALL, SHALL NOT,
+SHOULD, SHOULD NOT or MAY in capitals outside a code span. A lead-in line ending
+with `MUST:` (or another keyword and a colon) makes every list item that follows,
+up to the next blank line, normative as well. The provenance tag is the trailing
+`[...]` on the statement line, or on the lead-in line for inherited items.
 
 Tags: input | Q-NNN | D-NNN | inferred | (none)
 
@@ -19,24 +19,27 @@ adopted pack, one that `docs/inputs/README.md` declares an authoritative input i
 The register file (*-decision-register.md) is included: its bullets are all
 normative by definition, whether or not they use a keyword.
 
+The detector itself lives in `templates/scripts/check-docs.py` (`normative_statements`),
+where the generated pack's `normative-tagged` rule enforces it; this tool imports that
+function, so what the author reads here and what the gate asserts cannot differ.
+
 Used by the design-pack skill after every writing round and as the input list
 for the assumption hunter. Not shipped into generated repositories.
 """
 import argparse
 import glob
+import importlib.util
 import os
-import re
 import sys
 
-KEYWORD = re.compile(r"\b(MUST NOT|MUST|SHALL NOT|SHALL|SHOULD NOT|SHOULD|MAY)\b")
-LEADIN = re.compile(r"\b(MUST NOT|MUST|SHALL|SHOULD|MAY)\s*:\s*$")
-TAG = re.compile(r"\[((?:input|inferred|Q-\d{3}|D-\d{3})(?:[^\]]*))\]\s*$")
-HEADING = re.compile(r"^(#{2,4})\s+(\d+(?:\.\d+)*)\.?\s+(.*)$")
+CHECK_DOCS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "scripts", "check-docs.py")
 
 
-def tag_of(line):
-    m = TAG.search(line.rstrip())
-    return m.group(1).split(",")[0].strip() if m else "(none)"
+def load_detector():
+    spec = importlib.util.spec_from_file_location("checkdocs", CHECK_DOCS)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.normative_statements
 
 
 def main():
@@ -49,53 +52,19 @@ def main():
                          "that docs/inputs/README.md declares authoritative)")
     args = ap.parse_args()
 
+    normative_statements = load_detector()
     rows = []
     for path in sorted(glob.glob(os.path.join(args.specs, "[0-9][0-9]-*.md"))):
         name = os.path.basename(path)
         is_register = name.endswith("-decision-register.md")
-        section = "-"
-        fenced = False
-        inherit = None  # tag inherited from a lead-in, or None
         with open(path, encoding="utf-8") as fh:
-            lines = fh.read().splitlines()
-        for ln, line in enumerate(lines, 1):
-            if line.strip().startswith("```"):
-                fenced = not fenced
-                continue
-            if fenced:
-                continue
-            hm = HEADING.match(line)
-            if hm:
-                section = hm.group(2)
-                inherit = None
-                if is_register and "change control" in hm.group(3).lower():
-                    section = "change-control"
-                continue
-            if not line.strip():
-                continue  # a blank line between a lead-in and its list is common
-            is_item = bool(re.match(r"^\s*(?:[-*]|\d+\.)\s+\S", line))
-            if inherit is not None and not is_item:
-                inherit = None  # prose after the list ends the inheritance
-            normative = bool(KEYWORD.search(line))
-            if is_register and is_item and section != "change-control":
-                normative = True
-            if inherit is not None and is_item:
-                normative = True
-                tag = tag_of(line)
-                if tag == "(none)":
-                    tag = inherit
-            else:
-                tag = tag_of(line)
-            if LEADIN.search(line.strip()):
-                inherit = tag
-            if not normative:
-                continue
-            if tag == "(none)" and args.untagged_as:
-                tag = args.untagged_as
+            text = fh.read()
+        for ln, section, tag, statement in normative_statements(text, is_register):
+            if tag is None:
+                tag = args.untagged_as or "(none)"
             if args.untagged and tag != "(none)":
                 continue
-            text = re.sub(r"\s+", " ", TAG.sub("", line).strip(" -*"))
-            rows.append((name[:2], section, str(ln), tag, text[:160]))
+            rows.append((name[:2], section, str(ln), tag, statement[:160]))
 
     if args.format == "md":
         print("| Spec | § | Line | Provenance | Statement |")

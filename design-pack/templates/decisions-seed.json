@@ -1,9 +1,9 @@
 {
   "notes": [
-    "Source of the four regime records every pack starts with. Stage B round B2 renders the",
+    "Source of the five regime records every pack starts with. Stage B round B2 renders the",
     "placeholders, then appends each entry as a `decision-added` event with log-append.py and",
     "rebuilds DECISIONS.md. Nothing here is copied into the target as a file.",
-    "Placeholders: {{DATE}} {{NN_TRACE}} {{NN_REGISTER}} {{NN_PLAN}} {{REGISTER_CC_SECTION}}",
+    "Placeholders: {{DATE}} {{NN_TRACE}} {{NN_REGISTER}} {{NN_PLAN}} {{NN_PLAYBOOK}} {{REGISTER_CC_SECTION}}",
     "  {{REGISTER_CC_SECTION}} is the number of the register's change-control section (6 when the",
     "  register is rendered from its template; read it from the file for an adopted pack).",
     "D-003 depends on whether non-authoritative inputs exist. With them, use the exemplar's form:",
@@ -59,6 +59,16 @@
       "why": "avoids duplicating or silently editing spec documents while still giving agents a truthful, frequently updated status surface. Keeping the cards in one place with their answers preserves the alternatives the owner saw when deciding.",
       "alternatives": "editing status into the spec files (rejected: churns the contract); no implementation traceability (rejected: the playbook's Definition of Done requires reproducible verification); deleting answered cards (rejected: the alternatives considered are the only record of why the locked decision reads as it does).",
       "affected_specs": "none."
+    },
+    {
+      "id": "D-005",
+      "date": "{{DATE}}",
+      "title": "Agent execution contract",
+      "type": "implementation",
+      "decision": "Every implementation agent works under the execution contract of `specs/{{NN_PLAYBOOK}}-agent-playbook.md` §3: inspect before editing, restate assumptions and flag conflicts with locked decisions, implement the smallest coherent slice, add or update tests in the same change, run targeted then broader suites, keep contract artifacts and docs in step, and report changed behaviour, migration and rollback implications and remaining risks; and never changes scope or a locked decision, introduces an excluded capability, trusts a client-supplied ownership identifier, weakens a test to pass CI, edits or reformats unrelated code, builds speculative abstractions, commits secrets or sample personal data, or runs a destructive migration without an approved plan. The contract binds the agent's method, not the product: it touches no data, security, scope, external or UX decision, which is why it is a recorded default and not a card.",
+      "why": "an agent without a stated method fills the gaps with habit, and the habits that cost most (widening scope, weakening a test, trusting the client) are the ones no spec statement names because they are not about the product. Stating the method once, in the playbook, with a provenance tag, keeps it out of `AGENTS.md` prose and lets `make check-docs` hold the playbook to the same rule as every other spec: no normative statement without a home.",
+      "alternatives": "no explicit contract (rejected: the method drifts per session); the contract as red lines in `AGENTS.md` (rejected: red lines are product constraints with spec citations, and the file has a size ceiling); tagging the contract `[input]` (rejected: the owner never said it; it is the pack's default and must read as one).",
+      "affected_specs": "`{{NN_PLAYBOOK}}` §3 carries the tag; no text changed."
     }
   ]
 }

@@ -7,7 +7,7 @@ Rules:
     cited only when the card is under Resolved in QUESTIONS.md. Open cards stay in the domain spec.
   - Grouped by the five surfaces, in this order. An empty surface keeps its heading and the line
     "No locked decision on this surface." so numbering never shifts.
-  - Section 6 is verbatim.
+  - Section 6 is verbatim; its one normative sentence is tagged [D-002], the amendment regime.
 Placeholders: {{DATA_BULLETS}} {{SECURITY_BULLETS}} {{SCOPE_BULLETS}} {{EXTERNAL_BULLETS}} {{UX_BULLETS}}
               {{PRODUCT_NAME}}
 -->
@@ -44,4 +44,4 @@ These decisions are implementation constraints. A proposed change requires:
 3. migration and testing implications;
 4. Product Owner approval before code changes.
 
-The ADR is a `DECISIONS.md` entry of type `adr` carrying `Owner approval: pending` until the owner grants or rejects it. Agents MUST NOT reopen decisions merely because a different framework or pattern is familiar. Small implementation details may be decided locally if they preserve the locked behavior and are recorded in `DECISIONS.md`.
+The ADR is a `DECISIONS.md` entry of type `adr` carrying `Owner approval: pending` until the owner grants or rejects it. Agents MUST NOT reopen decisions merely because a different framework or pattern is familiar. Small implementation details may be decided locally if they preserve the locked behavior and are recorded in `DECISIONS.md`. [D-002]

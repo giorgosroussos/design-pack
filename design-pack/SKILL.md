@@ -60,7 +60,9 @@ nobody questions again. Four mechanisms, all mandatory, working together:
    it is not a card. If it can, it must be asked. There is no third category.
 3. **Provenance on every normative statement** (`reference/provenance.md`): `[input]`,
    `[Q-NNN]`, `[D-NNN]` or `[inferred]`, trailing, on every MUST/SHOULD/MAY. The locked
-   register may hold only `[input]` and Resolved `[Q-NNN]`; `check-docs` enforces it.
+   register may hold only `[input]` and Resolved `[Q-NNN]`; `check-docs` enforces it, and
+   enforces the tag itself (`normative-tagged`) and that no `[inferred]` survives the
+   freeze (`inferred-zero`), in the generated pack, for as long as it lives.
 4. **The assumption hunter** (`stages/hunter.md`): a fresh agent with one mandate reads the
    pack and writes every surface-touching statement that is not `[input]` or `[Q-NNN]` as a
    card. It fixes nothing and judges nothing.
@@ -136,7 +138,7 @@ raises it before that phase. Silent decision is the only unacceptable state.
 | `templates/scripts/eventlog.py` | the event log: chain primitives, event validation, the decisions projection |
 | `templates/scripts/log-append.py`, `verify-chain.py` | the only sanctioned writer, and the chain check |
 | `templates/scripts/rebuild-decisions.py`, `rebuild-questions.py` | the two projections, both thin over the shared renderer |
-| `templates/decisions-seed.json` | the four regime records Stage B appends to a fresh log |
+| `templates/decisions-seed.json` | the five regime records Stage B appends to a fresh log |
 | `templates/log-README.md` | the log's own README: canonical form, and what the chain does not guarantee |
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |

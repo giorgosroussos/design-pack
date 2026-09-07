@@ -36,7 +36,12 @@ A statement may carry several tags when it merges sources: `[input, Q-003]`. The
 first tag is the primary one.
 
 Tables in specs are not normative statements. If a table row must be normative,
-a sentence above the table carries the requirement and its tag.
+a sentence above the table carries the requirement and its tag. A keyword inside a
+code span (`` `MUST` ``) is a mention, not a statement; write it that way when prose
+talks *about* the requirement language, as `specs/README.md` does.
+
+The tag is the last thing on the line, always: `… Out of Scope. [input] A code change …`
+leaves the statement untagged as far as any tool can tell.
 
 ## Where each tag may appear
 
@@ -57,11 +62,30 @@ a sentence above the table carries the requirement and its tag.
    is a finding for the assumption hunter, which writes it as a card. The hunter does
    not judge merit; the owner does.
 
+## The two mechanical rules that hold everywhere
+
+`check-docs` enforces the form in every generated pack, not only while the skill runs:
+
+- **`normative-tagged`.** Every normative statement in `specs/` ends with a tag. An untagged
+  `MUST` fails the gate, in a draft as much as in a frozen pack. (An adopted pack, one whose
+  `docs/inputs/README.md` lists `specs/` itself as an authoritative input, is exempt: its
+  statements are `[input]` by declaration.)
+- **`inferred-zero`.** Once `specs/README.md` is stamped `Status: Implementation baseline`,
+  no `[inferred]` remains anywhere in `specs/`. Before the stamp the count is reported and
+  not enforced, because Stages B–D legitimately carry them.
+
 ## At freeze
 
 Zero `[inferred]` tags remain anywhere in `specs/`. Each one has become either a card
-(surface touched) or a `[D-NNN]` (surface not touched). `check-docs` reports the
-count per file; Stage D does not stamp the baseline while it is non-zero.
+(surface touched) or a `[D-NNN]` (surface not touched). `inferred-zero` fails the gate
+otherwise, so Stage D cannot stamp a baseline over one.
+
+A frozen pack **may** still cite an Open card. That is a deferral the owner chose, with its
+`Blocks:` naming the phase or package before which it is answered, and the statement that
+cites it reads as the recommendation until then. `check-docs` names every such statement in
+its summary ("provisional statements … in a FROZEN pack") and does not fail on it; the owner
+decided that freedom is worth more than the assertion. Session prompt 3 and the `Blocks:`
+field are the net.
 
 ## Why the form is fixed
 

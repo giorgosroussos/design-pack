@@ -35,9 +35,12 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
 
 1. `make check-docs` exit 0, which includes `chain-intact` and `projection-fresh`; `make
    verify-chain` exit 0 on its own.
-2. `extract-normative` shows zero `[inferred]`; for a pack this skill wrote, zero untagged
-   statements as well; for an adopted pack, the register is physically tagged (the flag
-   relabels the rest, so untagged is not a check there).
+2. `check-docs` covers the tags: `normative-tagged` fails on any untagged statement (an
+   adopted pack is exempt by its `docs/inputs/README.md` declaration), and `inferred-zero`
+   will fail the moment the baseline is stamped if any `[inferred]` remains, so clear them
+   here, before D4. `extract-normative` is the listing to read while doing so. Statements that
+   cite an Open card are allowed to stay; the summary line names them, so the owner sees what
+   they are deferring past the freeze.
 3. `TRACEABILITY.md` contains no `done` or `in progress`; `GAPS.md` has G-001; `PLAN.md` Now is
    FND-01. These are the truthful-empty invariants; `check-docs` covers the rest.
 

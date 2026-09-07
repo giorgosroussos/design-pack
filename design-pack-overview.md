@@ -70,8 +70,10 @@ exactly one commit, and re-locks automatically afterward. Enforcement lives in g
 filesystem permissions — the skill defines the contract, the environment enforces it, and the
 implementation agent cannot quietly break an append-only or locked file even if instructed to.
 A mechanical checker (`make check-docs`) verifies internal consistency on every run: every
-cross-reference resolves, the locked register contains only owner decisions, no statement is
-left untagged.
+cross-reference resolves, the locked register contains only owner decisions, no normative
+statement is left untagged, and no unratified `[inferred]` survives the freeze. A statement may
+still cite a question the owner deliberately left open; the checker names those rather than
+failing on them, because that deferral is the owner's to make.
 
 **Honest limits, stated up front.** The hash chain detects any edit to history but does not
 authenticate authorship — it defends against accidental rewrites and silent drift, not a
