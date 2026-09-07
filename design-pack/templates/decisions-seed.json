@@ -1,0 +1,64 @@
+{
+  "notes": [
+    "Source of the four regime records every pack starts with. Stage B round B2 renders the",
+    "placeholders, then appends each entry as a `decision-added` event with log-append.py and",
+    "rebuilds DECISIONS.md. Nothing here is copied into the target as a file.",
+    "Placeholders: {{DATE}} {{NN_TRACE}} {{NN_REGISTER}} {{NN_PLAN}} {{REGISTER_CC_SECTION}}",
+    "  {{REGISTER_CC_SECTION}} is the number of the register's change-control section (6 when the",
+    "  register is rendered from its template; read it from the file for an adopted pack).",
+    "D-003 depends on whether non-authoritative inputs exist. With them, use the exemplar's form:",
+    "  decision: \"<path> is <visual/UX/competitor> direction for <component> only. Specs override any",
+    "  behaviour it shows. Each behavioural conflict is recorded in QUESTIONS.md (Q-NNN to Q-MMM) and",
+    "  resolved by an owner answer before implementation.\"",
+    "  why: \"an input without a declared authority level becomes a requirements source by default,",
+    "  silently.\"  alternatives: \"treat all inputs as authoritative (rejected: direction and",
+    "  requirements would blend)\".",
+    "Without them: decision \"No non-authoritative input was received. Any mockup, competitor reference",
+    "  or prior draft added later receives an authority row in docs/inputs/README.md and a superseding",
+    "  entry before an agent may use it.\", same why, same alternatives.",
+    "The preamble of DECISIONS.md is not here: it is owned by scripts/eventlog.py (PREAMBLE), because",
+    "the projection renders the whole file and prose with two homes drifts."
+  ],
+  "events": [
+    {
+      "id": "D-001",
+      "date": "{{DATE}}",
+      "title": "Repository documentation regime",
+      "type": "implementation",
+      "decision": "`AGENTS.md` at repository root is the single entry point for agents; `CLAUDE.md` and any per-directory agent file are thin pointers to it with tool- or directory-specific notes only, never a second source of rules. Living documents (`PLAN.md`, `DECISIONS.md`, `GAPS.md`, `QUESTIONS.md`, `TRACEABILITY.md`) live at the root. Raw requirements live under `docs/inputs/` with their authority declared in `docs/inputs/README.md`. Agent decisions are recorded as events in the append-only, hash-chained log `.log/events.jsonl`, and `DECISIONS.md` is its projection: rebuilt by `scripts/rebuild-decisions.py`, never authored, and compared against the log on every run of the gate. The root `Makefile` is the command contract from the first commit: `make check-docs` (`scripts/check-docs.py`) is real and enforces the mechanical consistency of these documents; every other target fails with a message naming its work package until that package delivers it. `docs/` is otherwise reserved for runbooks and long-form ADRs once code exists.",
+      "why": "a fresh agent session must find one file and be unable to miss the current state. A rule that is checked mechanically does not need to be remembered, so every rule that can be a `check-docs` assertion is one and is not repeated in prose. A placeholder target that fails loudly keeps \"the contract exists\" and \"the contract works\" distinguishable. A record whose integrity is checked mechanically does not depend on anyone remembering not to edit it, which is why the decision stream is a log with a projection rather than a file that everyone promises to append to.",
+      "alternatives": "living documents under `docs/` (rejected: discoverability); a single combined status document (rejected: mixes history with current state); no `Makefile` until FND-01 (rejected: `check-docs` must run from day one and the contract's target list must be visible to the first implementation session); silently passing placeholder targets (rejected: indistinguishable from a working contract). `DECISIONS.md` itself as the source of truth (rejected: a changed body under an unchanged ID is invisible to any check that reads only the current state).",
+      "affected_specs": "none."
+    },
+    {
+      "id": "D-002",
+      "date": "{{DATE}}",
+      "title": "Spec amendment regime",
+      "type": "implementation",
+      "decision": "agents may amend non-locked text in `specs/` when implementation requires it, provided the same change adds a dated `spec-amendment` entry here and the amended statement carries a provenance tag. Spec sections are never renumbered; new content is appended. Every bullet in `specs/{{NN_REGISTER}}-decision-register.md` and every red line listed in `AGENTS.md` is excluded from delegation and requires an `adr` entry with owner approval before code changes.",
+      "why": "keeps the spec pack accurate as implementation reveals defects, without weakening the change control that `{{NN_REGISTER}}` §{{REGISTER_CC_SECTION}} requires for locked decisions. Stable numbering keeps every citation in the living documents resolving, which `make check-docs` verifies.",
+      "alternatives": "no agent spec edits at all (rejected: specs drift from code); full delegation including locked decisions (rejected: contradicts the register's change control).",
+      "affected_specs": "operationalizes `specs/README.md` §Conflict resolution and `{{NN_REGISTER}}` §{{REGISTER_CC_SECTION}}; no text changed."
+    },
+    {
+      "id": "D-003",
+      "date": "{{DATE}}",
+      "title": "Authority of non-authoritative inputs",
+      "type": "implementation",
+      "decision": "{{D003_DECISION}}",
+      "why": "{{D003_WHY}}",
+      "alternatives": "{{D003_ALTERNATIVES}}",
+      "affected_specs": "none."
+    },
+    {
+      "id": "D-004",
+      "date": "{{DATE}}",
+      "title": "Division of labour between spec documents and living documents",
+      "type": "implementation",
+      "decision": "`specs/{{NN_TRACE}}-traceability.md` remains the owner-maintained product-intent scope matrix; root `TRACEABILITY.md` records implementation status and evidence per work package and critical journey, with status set only from evidence that ran and passed. `specs/{{NN_REGISTER}}-decision-register.md` remains the locked register of owner decisions with their provenance; the event log records implementation decisions, spec amendments and ADR proposals as events, and root `DECISIONS.md` is the projection an agent reads. `specs/{{NN_PLAN}}-implementation-plan.md` remains the phase plan; root `PLAN.md` holds only the current slice and the next few. `QUESTIONS.md` holds the decision cards, open and resolved; a resolved card is cited by the spec statement it produced.",
+      "why": "avoids duplicating or silently editing spec documents while still giving agents a truthful, frequently updated status surface. Keeping the cards in one place with their answers preserves the alternatives the owner saw when deciding.",
+      "alternatives": "editing status into the spec files (rejected: churns the contract); no implementation traceability (rejected: the playbook's Definition of Done requires reproducible verification); deleting answered cards (rejected: the alternatives considered are the only record of why the locked decision reads as it does).",
+      "affected_specs": "none."
+    }
+  ]
+}

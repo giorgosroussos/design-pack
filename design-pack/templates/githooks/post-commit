@@ -1,0 +1,10 @@
+#!/bin/sh
+# Transport only. Consumes the single-use unlock token: one ceremony, one commit.
+set -eu
+token=".doc-unlock"
+[ -f "$token" ] || exit 0
+sed -n 's/^path: *//p' "$token" | while IFS= read -r path; do
+    [ -e "$path" ] && chmod 0444 -- "$path"
+done
+rm -f "$token"
+echo "lock-guard: unlock token consumed; the path is read-only again."
