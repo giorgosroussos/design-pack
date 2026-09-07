@@ -195,19 +195,25 @@ line. They are read from the diff instead.
 
 `.doc-locks`, one `tier: glob` per line, **last matching rule wins** — so promoting a file is a
 line appended at the end, and the manifest is its own history of promotions. A path matching
-nothing is `free`.
+nothing is `free`. Because a demotion would be an equally legal append, the guard compares the
+manifest before and after every change that touches it and refuses any path whose tier would go
+down, whichever glob does it (**demotion rule**); tiers only ever go up. The manifest, the guard,
+the ceremony script and the hooks are hard-locked from the first commit, so a change to any of
+them is a ceremony.
 
 | Tier | Meaning | Held by, at Stage C |
 | --- | --- | --- |
 | `hard-locked` | may not change at all | `docs/inputs/**` — what the owner actually said |
-| `append-only` | existing lines may never be removed or modified; additions allowed anywhere | `.log/events.jsonl`, `UNLOCKS.md`, `.doc-locks` |
+| `append-only` | existing lines may never be removed or modified; additions allowed anywhere | `.log/events.jsonl`, `UNLOCKS.md` |
 | `free` | mutable by design, listed explicitly so mutability reads as a decision | the living documents, the two projections, `specs/` until the freeze |
+| `hard-locked` (the layer itself) | as above | `.doc-locks`, `scripts/lock-guard.py`, `scripts/unlock.sh`, `.githooks/**` |
 
 `free` does not mean unguarded. `DECISIONS.md` and `QUESTIONS.md` are free because they are
 generated and the rebuild has to be able to write them; `projection-fresh` is what stops a hand
 edit from surviving. Tiers are promoted as the pack matures, never assumed: a file is locked when
 the stage that legitimately writes it is over, which is why the freeze is what promotes `specs/`
-to `hard-locked`.
+to `hard-locked` — through `make unlock PATH=.doc-locks`, so the freeze itself is a recorded
+ceremony.
 
 ### 5.2 The guard and the hooks
 
@@ -228,10 +234,12 @@ drift apart:
 
 `git commit --no-verify` skips the local hook; nothing in a client-side hook can prevent that.
 The local hook is fast feedback, **the pre-receive mirror on the remote is the guarantee** — it
-runs where the committer's flags do not reach. It reads the manifest and the guard from the
-revision being replaced, not the one being pushed, so a push cannot relax a lock and break it in
-the same breath. A repository without such a remote has feedback and no guarantee, and should say
-so rather than assume the locks hold.
+runs where the committer's flags do not reach. Both read the manifest that judges a change from
+*before* it (`HEAD`, or the revision being replaced), never from the change itself, and hand the
+guard the manifest *after* it for the demotion rule — so a push cannot relax a lock and break it
+in the same breath, nor relax it in one push and use the relaxation in the next. A repository
+without such a remote has feedback and no guarantee, and should say so rather than assume the
+locks hold.
 
 ### 5.3 The unlock ceremony
 
@@ -480,11 +488,11 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
-| `test-lock-guard.sh` | 14 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, plus eleven policy unit cases over crafted diffs |
+| `test-lock-guard.sh` | 20 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
 | `test-decisions-log.sh` | 15 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 31 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
 | `test-check-docs.sh` | 5 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity |
-| `test-render.sh` | 17 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit and the freeze promotion, and one broken red line failing the gate |
+| `test-render.sh` | 20 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, and one broken red line failing the gate |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession

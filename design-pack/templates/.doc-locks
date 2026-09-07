@@ -14,7 +14,13 @@
 # Enforced by scripts/lock-guard.py over the diff, from .githooks/pre-commit
 # locally and from the pre-receive hook on the remote. `make install-hooks`
 # activates the local ones; `make check-locks` runs the same check by hand.
-# Tiers are promoted as the pack matures; each promotion is a committed change.
+# Tiers are promoted as the pack matures; each promotion is a committed change,
+# and this file is hard-locked, so each is a `make unlock PATH=.doc-locks` with
+# its reason in UNLOCKS.md. Tiers never go down: the guard compares the manifest
+# before and after a change and refuses any path whose tier would be lowered,
+# whichever glob does it (demotion rule). The change that judges a commit is
+# always read from HEAD (or, on the remote, from the revision being replaced),
+# never from the working tree, so a commit cannot relax a lock for itself.
 
 version: 1
 
@@ -53,8 +59,13 @@ append-only: UNLOCKS.md
 free: DECISIONS.md
 free: QUESTIONS.md
 
-# This manifest: promotions are appended, never edited away.
-append-only: .doc-locks
+# The lock layer guards itself. The guard, the ceremony script, the hooks and
+# this manifest are hard-locked from the first commit: a guard that the diff it
+# judges may rewrite is no guard. Updating any of them is a ceremony.
+hard-locked: scripts/lock-guard.py
+hard-locked: scripts/unlock.sh
+hard-locked: .githooks/**
+hard-locked: .doc-locks
 
 # --- hard-locked: the raw material -------------------------------------------
 # What the owner actually said. Nothing in the pack ever edits it; a new or

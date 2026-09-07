@@ -55,16 +55,20 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
 
 1. Stamp `specs/README.md`: `Version: 1.0`, `Status: Implementation baseline`, add the date on
    the Status line. This is the last ordinary write to `specs/`, so it happens before step 2.
-2. Promote the tiers, by appending to `.doc-locks` (never by editing a line; the manifest is
-   append-only and the last matching rule wins):
+2. Promote the tiers. The manifest is hard-locked, so this is a ceremony, and the ceremony is
+   the record of the freeze:
+   `make unlock PATH=.doc-locks REASON="freeze <version>: promote specs/** to hard-locked"`,
+   then append to `.doc-locks` (never edit a line; the last matching rule wins, and the guard
+   refuses any change that lowers a tier):
 
    ```
    # Frozen at the baseline, <date>: the contract itself.
    hard-locked: specs/**
    ```
 
-   `QUESTIONS.md` is not promoted: it is a projection, and `projection-fresh` already refuses any
-   change to it that the log does not carry.
+   The unlock is good for the one commit that carries the promotion and the stamped
+   `specs/README.md`. `QUESTIONS.md` is not promoted: it is a projection, and `projection-fresh`
+   already refuses any change to it that the log does not carry.
 
    Then `git ls-files -z specs | xargs -0 -r chmod 0444`. From here a spec amendment under
    D-002 is a `make unlock PATH=specs/NN-name.md REASON="..."` with its `spec-amendment` event

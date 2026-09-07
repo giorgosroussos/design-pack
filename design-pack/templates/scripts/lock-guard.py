@@ -15,7 +15,7 @@ transport and contain no rules.
 Usage, from the repository root:
 
     python3 scripts/lock-guard.py --staged          # what .githooks/pre-commit runs
-    git diff OLD NEW | python3 scripts/lock-guard.py
+    git diff OLD NEW | python3 scripts/lock-guard.py --manifest OLD.doc-locks --new-manifest NEW.doc-locks
     python3 scripts/lock-guard.py --tier specs/README.md
 
 Manifest (`.doc-locks`), one rule per line, `tier: glob`:
@@ -37,6 +37,18 @@ Rules
                 removal plus an addition. Additions are always allowed, anywhere
                 in the file
   free          never a violation
+  demotion      the manifest itself may only ever tighten. When the diff changes
+                the manifest, every glob of the old and the new manifest (and
+                every path in the diff) is probed against both; a path whose tier
+                goes down (hard-locked -> append-only -> free) is a violation,
+                whatever else the diff carries. Promotions are free. The rule needs
+                both manifests: `--staged` reads them from HEAD and the index, the
+                pre-receive hook passes `--new-manifest`; a manifest change with
+                no new manifest to compare fails closed
+
+The manifest that judges a change is the one BEFORE the change (HEAD, or the
+revision being replaced), never the one the change proposes; otherwise a commit
+could relax a lock and use the relaxation in the same breath.
 
 Authorization for a hard-locked path comes from either of two places, both
 written by `make unlock`:
@@ -56,6 +68,7 @@ import subprocess
 import sys
 
 TIERS = ("hard-locked", "append-only", "free")
+TIER_RANK = {"free": 0, "append-only": 1, "hard-locked": 2}
 DEFAULT_MANIFEST = ".doc-locks"
 DEFAULT_TOKEN = ".doc-unlock"
 DEFAULT_LOG = "UNLOCKS.md"
@@ -282,14 +295,57 @@ def read_token(text):
     return out
 
 
-def check(diff_text, rules, token_paths=(), log_path=DEFAULT_LOG):
-    """Pure function: (diff, manifest, token) -> list of violations.
+def probe_path(glob):
+    """A concrete path that the glob matches, to compare its tier under two manifests."""
+    return glob.replace("**/", "a/").replace("**", "a/b").replace("*", "a").replace("?", "a")
 
+
+def demotions(old_rules, new_rules, extra_paths=()):
+    """Every (old glob, old tier, new tier, new glob) where a path's tier goes down.
+
+    Probing the globs of both manifests catches the same glob re-declared lower,
+    a broader glob added over a locked one, and a narrower glob carved out of
+    one; the paths of the diff are probed as well, so a demotion aimed at exactly
+    the file being changed cannot slip between the globs.
+    """
+    probes = set(probe_path(g) for _, _, g in old_rules) | set(probe_path(g) for _, _, g in new_rules)
+    probes |= set(extra_paths)
+    seen, out = set(), []
+    for path in sorted(probes):
+        before, old_glob = tier_of(path, old_rules)
+        after, new_glob = tier_of(path, new_rules)
+        if TIER_RANK[after] < TIER_RANK[before]:
+            key = (old_glob or path, before, after, new_glob)
+            if key not in seen:
+                seen.add(key)
+                out.append(key)
+    return out
+
+
+def check(diff_text, rules, token_paths=(), log_path=DEFAULT_LOG,
+          manifest_path=DEFAULT_MANIFEST, new_rules=None):
+    """Pure function: (diff, manifest, token, new manifest) -> list of violations.
+
+    `rules` is the manifest before the change and judges every path. `new_rules`
+    is the manifest after it, needed only when the diff touches `manifest_path`.
     Each violation is (rule, path, detail).
     """
     files = parse_diff(diff_text)
     authorized = set(token_paths) | authorized_from_diff(files, log_path)
     violations = []
+
+    if manifest_path in files:
+        if new_rules is None:
+            violations.append((
+                "demotion", manifest_path,
+                "the manifest changes in this diff but the new manifest was not supplied, so its "
+                "tiers cannot be compared; pass --new-manifest (or use --staged)"))
+        else:
+            for old_glob, before, after, new_glob in demotions(rules, new_rules, files):
+                violations.append((
+                    "demotion", manifest_path,
+                    "`%s` would go from %s to %s (rule `%s: %s`); tiers are promoted, never demoted"
+                    % (old_glob, before, after, after, new_glob)))
 
     for path in sorted(files):
         info = files[path]
@@ -338,11 +394,32 @@ def staged_diff(root):
     return proc.stdout.decode("utf-8", "replace")
 
 
+def git_show(root, spec):
+    """Contents of `<rev>:<path>` (or `:<path>` for the index), or None if absent."""
+    proc = subprocess.run(["git", "show", spec], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", "replace")
+
+
+def parse_manifest_text(text, label):
+    try:
+        return load_manifest(text)
+    except ManifestError as exc:
+        sys.stderr.write("lock-guard: %s: %s\n" % (label, exc))
+        sys.exit(2)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Enforce the documentation lock manifest over a diff.")
     ap.add_argument("--root", default=".", help="repository root (default: current directory)")
     ap.add_argument("--staged", action="store_true", help="check the staged change instead of stdin")
-    ap.add_argument("--manifest", default=None, help="manifest file (default: <root>/%s)" % DEFAULT_MANIFEST)
+    ap.add_argument("--manifest", default=None,
+                    help="the manifest BEFORE the change, which judges it (default with --staged: "
+                         "HEAD's %s; otherwise <root>/%s)" % (DEFAULT_MANIFEST, DEFAULT_MANIFEST))
+    ap.add_argument("--new-manifest", default=None,
+                    help="the manifest AFTER the change, compared for demotions when the diff "
+                         "touches it (default with --staged: the index's copy)")
     ap.add_argument("--token", default=None, help="unlock token file (default: <root>/%s)" % DEFAULT_TOKEN)
     ap.add_argument("--no-token", action="store_true",
                     help="ignore any local token; a server-side hook never sees one")
@@ -352,16 +429,46 @@ def main():
     args = ap.parse_args()
 
     root = os.path.abspath(args.root)
-    manifest_path = args.manifest or os.path.join(root, DEFAULT_MANIFEST)
-    if not os.path.isfile(manifest_path):
-        sys.stderr.write("lock-guard: no manifest at %s\n" % manifest_path)
-        return 2
-    with open(manifest_path, encoding="utf-8") as fh:
-        try:
-            rules = load_manifest(fh.read())
-        except ManifestError as exc:
-            sys.stderr.write("lock-guard: %s: %s\n" % (manifest_path, exc))
+    worktree_manifest = os.path.join(root, DEFAULT_MANIFEST)
+
+    # The judging manifest. With --staged it is HEAD's copy: the working tree's
+    # may be the very change under judgement. Before the first commit, or when
+    # HEAD has no manifest yet, the staged copy is all there is.
+    manifest_text, manifest_label = None, None
+    if args.manifest:
+        manifest_label = args.manifest
+        if not os.path.isfile(args.manifest):
+            sys.stderr.write("lock-guard: no manifest at %s\n" % args.manifest)
             return 2
+        with open(args.manifest, encoding="utf-8") as fh:
+            manifest_text = fh.read()
+    elif args.staged:
+        manifest_text = git_show(root, "HEAD:%s" % DEFAULT_MANIFEST)
+        manifest_label = "HEAD:%s" % DEFAULT_MANIFEST
+        if manifest_text is None:
+            manifest_text = git_show(root, ":%s" % DEFAULT_MANIFEST)
+            manifest_label = "staged %s" % DEFAULT_MANIFEST
+    if manifest_text is None:
+        manifest_label = worktree_manifest
+        if not os.path.isfile(worktree_manifest):
+            sys.stderr.write("lock-guard: no manifest at %s\n" % worktree_manifest)
+            return 2
+        with open(worktree_manifest, encoding="utf-8") as fh:
+            manifest_text = fh.read()
+    rules = parse_manifest_text(manifest_text, manifest_label)
+
+    # The proposed manifest, for the demotion rule.
+    new_rules = None
+    if args.new_manifest:
+        if not os.path.isfile(args.new_manifest):
+            sys.stderr.write("lock-guard: no manifest at %s\n" % args.new_manifest)
+            return 2
+        with open(args.new_manifest, encoding="utf-8") as fh:
+            new_rules = parse_manifest_text(fh.read(), args.new_manifest)
+    elif args.staged:
+        staged_text = git_show(root, ":%s" % DEFAULT_MANIFEST)
+        if staged_text is not None:
+            new_rules = parse_manifest_text(staged_text, "staged %s" % DEFAULT_MANIFEST)
 
     if args.tier:
         probe = args.tier[2:] if args.tier.startswith("./") else args.tier
@@ -377,7 +484,7 @@ def main():
         with open(token_path, encoding="utf-8") as fh:
             token_paths = read_token(fh.read())
 
-    violations = check(diff_text, rules, token_paths, args.log)
+    violations = check(diff_text, rules, token_paths, args.log, DEFAULT_MANIFEST, new_rules)
 
     for rule, path, detail in violations:
         print("LOCK %-12s %s: %s" % (rule, path, detail))
@@ -386,7 +493,7 @@ def main():
         print("lock-guard: %d violation(s). Nothing was committed." % len(violations))
         return 1
     if not args.quiet:
-        print("lock-guard: clean (%d rule(s) in %s)" % (len(rules), os.path.basename(manifest_path)))
+        print("lock-guard: clean (%d rule(s) in %s)" % (len(rules), manifest_label))
     return 0
 
 

@@ -261,6 +261,87 @@ else
     report ok "5b the bypassed commit is caught by the server-side check" ""
 fi
 
+# --- 7. the manifest may only tighten ------------------------------------------
+# W3: appending a demotion is a legal append, so the guard compares the manifest
+# before and after the change and refuses any path whose tier would go down.
+
+HEAD7="$(git rev-parse HEAD)"
+printf '\nfree: docs/inputs/**\n' >> .doc-locks
+chmod u+w docs/inputs/requirements.md
+printf 'Edited under a self-granted demotion.\n' >> docs/inputs/requirements.md
+git add .doc-locks docs/inputs/requirements.md
+if guard; then
+    report no "7 demotion + edit in one commit" "the guard accepted it"
+elif grep -q 'LOCK demotion' "$work/guard.out" && grep -q 'docs/inputs/requirements.md' "$work/guard.out"; then
+    report ok "7 a demotion appended in the same commit as the edit it enables is blocked, twice over" ""
+else
+    report no "7 demotion" "$(cat "$work/guard.out")"
+fi
+git reset -q --hard "$HEAD7"
+chmod 0444 docs/inputs/requirements.md
+
+# the two-push variant: push 1 only demotes, push 2 would use it. The server
+# judges push 1 with the manifest it replaces and compares it to the one pushed.
+printf '\nfree: docs/inputs/**\n' >> .doc-locks
+git add .doc-locks
+git commit -q --no-verify -m "push 1: demote only" >/dev/null 2>&1
+git show "$HEAD7:.doc-locks" > "$work/m.base"
+git show "HEAD:.doc-locks" > "$work/m.new"
+git diff --no-color --no-renames --unified=0 "$HEAD7" HEAD > "$work/push1.diff"
+if python3 scripts/lock-guard.py --manifest "$work/m.base" --new-manifest "$work/m.new" --no-token --quiet < "$work/push1.diff" >"$work/pr7.out" 2>&1; then
+    report no "7b a demotion-only push" "the server-side check accepted it"
+elif grep -q 'LOCK demotion' "$work/pr7.out"; then
+    report ok "7b a push that only demotes is rejected server-side, so no later push can use it" ""
+else
+    report no "7b demotion-only push" "$(cat "$work/pr7.out")"
+fi
+# a server that is not handed the pushed manifest fails closed rather than guessing
+if python3 scripts/lock-guard.py --manifest "$work/m.base" --no-token --quiet < "$work/push1.diff" >"$work/pr7c.out" 2>&1; then
+    report no "7c manifest change without --new-manifest" "accepted"
+elif grep -q 'new manifest was not supplied' "$work/pr7c.out"; then
+    report ok "7c a manifest change with no new manifest to compare fails closed" ""
+else
+    report no "7c fail closed" "$(cat "$work/pr7c.out")"
+fi
+git reset -q --hard "$HEAD7"
+chmod 0444 docs/inputs/requirements.md
+
+# --- 8. the lock layer guards itself -------------------------------------------
+
+printf '# weakened\n' >> scripts/lock-guard.py
+git add scripts/lock-guard.py
+if guard; then
+    report no "8 editing the guard" "passed without a ceremony"
+elif grep -q 'scripts/lock-guard.py' "$work/guard.out"; then
+    report ok "8 editing scripts/lock-guard.py without a ceremony is blocked" ""
+else
+    report no "8 guard self-protection" "$(cat "$work/guard.out")"
+fi
+git reset -q --hard "$HEAD7"
+
+# a promotion is the one manifest change the pack needs; with the Stage C
+# manifest it is a ceremony, and it goes through
+printf '\nhard-locked: specs/**\n' >> .doc-locks
+git add .doc-locks
+if guard; then
+    report no "8b promotion without a ceremony" "the hard-locked manifest changed freely"
+else
+    report ok "8b a promotion without a ceremony is blocked: the manifest is hard-locked" ""
+fi
+git reset -q --hard "$HEAD7"
+if unlock_cmd .doc-locks "freeze: promote specs/**"; then
+    printf '\nhard-locked: specs/**\n' >> .doc-locks
+    git add .doc-locks
+    if git commit -q -m "freeze" >"$work/commit8c.out" 2>&1; then
+        report ok "8c a promotion through make unlock is accepted (no demotion, path authorized)" ""
+    else
+        report no "8c promotion ceremony" "$(cat "$work/commit8c.out")"
+    fi
+else
+    report no "8c unlock .doc-locks" "$(cat "$work/unlock.out")"
+fi
+chmod 0444 docs/inputs/requirements.md
+
 # --- policy unit cases --------------------------------------------------------
 # The guard is a pure function of (diff, manifest, token). These run it directly
 # on crafted diffs, with no git and no filesystem in the way.
@@ -282,6 +363,38 @@ hard-locked: docs/inputs/**
 hard-locked: specs/**
 free: specs/README.md
 """)
+
+BASE_MANIFEST = """
+version: 1
+free: scripts/**
+append-only: .doc-locks
+hard-locked: docs/inputs/**
+"""
+def tiers(extra):
+    return lg.load_manifest(BASE_MANIFEST + extra + "\n")
+base = tiers("")
+demote = lambda extra: [(o, b, a) for o, b, a, _ in lg.demotions(base, tiers(extra))]
+assert demote("free: docs/inputs/**") == [("docs/inputs/**", "hard-locked", "free")], "same glob, lower tier"
+assert demote("free: docs/**") == [("docs/inputs/**", "hard-locked", "free")], "a broader glob over a locked one"
+assert demote("free: docs/inputs/req.md") == [("docs/inputs/**", "hard-locked", "free")], "a narrower glob carved out"
+assert demote("append-only: docs/inputs/**") == [("docs/inputs/**", "hard-locked", "append-only")], "one step down is still down"
+assert demote("hard-locked: specs/**") == [], "a promotion of a free path is not a demotion"
+assert demote("hard-locked: .doc-locks") == [], "tightening the manifest itself is not a demotion"
+assert demote("free: scripts/**") == [], "re-declaring the same tier is not a demotion"
+
+MANIFEST_APPEND = """
+diff --git a/.doc-locks b/.doc-locks
+--- a/.doc-locks
++++ b/.doc-locks
+@@ -4,0 +5 @@
++hard-locked: specs/**
+"""
+# with an append-only manifest (an older pack), a promotion is an ordinary append
+assert lg.check(MANIFEST_APPEND, base, new_rules=tiers("hard-locked: specs/**")) == [], "promotion under an append-only manifest needs no ceremony"
+v = lg.check(MANIFEST_APPEND.replace("hard-locked: specs/**", "free: docs/inputs/**"), base, new_rules=tiers("free: docs/inputs/**"))
+assert [x[0] for x in v] == ["demotion"], "a demotion appended to an append-only manifest is exactly one violation: %r" % v
+v = lg.check(MANIFEST_APPEND, base)
+assert [x[0] for x in v] == ["demotion"] and "not supplied" in v[0][2], "no new manifest -> fail closed: %r" % v
 
 MODIFY_INPUT = """
 diff --git a/docs/inputs/req.md b/docs/inputs/req.md
@@ -386,7 +499,7 @@ for b in bad:
 sys.exit(1 if bad else 0)
 UNITEOF
 then
-    report ok "6 policy unit cases over crafted diffs (11 cases)" ""
+    report ok "6 policy unit cases over crafted diffs (21 cases)" ""
 else
     report no "6 policy unit cases" "see the lines above"
 fi

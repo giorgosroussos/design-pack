@@ -454,18 +454,61 @@ fi
 
 # --- 6. the freeze (D4) on this pack -------------------------------------------
 
+unlock_cmd() {  # unlock_cmd <path> <reason>
+    if [ -n "$HAVE_MAKE" ]; then make unlock PATH="$1" REASON="$2" >"$work/unlock.out" 2>&1
+    else sh scripts/unlock.sh "$1" "$2" >"$work/unlock.out" 2>&1; fi
+}
 sed -i 's/^Version: 0.1-draft  $/Version: 1.0  /; s/^Status: Draft, not yet an implementation baseline  $/Status: Implementation baseline, 2026-09-08  /' specs/README.md
-printf '\n# Frozen at the baseline, 2026-09-08: the contract itself.\nhard-locked: specs/**\n' >> .doc-locks
-if check_docs > "$work/cd6.out" 2>&1; then
-    report ok "6 check-docs still passes after the freeze stamp" ""
+git add specs/README.md && git commit -q -m "stamp the baseline" >/dev/null 2>&1
+
+# the manifest is hard-locked, so the promotion is a ceremony (D4 step 2)
+printf '\n# Frozen at the baseline, 2026-09-08: the contract itself.\nhard-locked: specs/**\n' > "$work/promotion"
+cat "$work/promotion" >> .doc-locks
+git add .doc-locks
+if check_locks > "$work/locks6.out" 2>&1; then
+    report no "6 promotion without a ceremony" "the guard let .doc-locks change without an unlock"
+elif grep -q 'LOCK hard-locked  .doc-locks' "$work/locks6.out"; then
+    report ok "6 appending to the hard-locked manifest without a ceremony is blocked" ""
 else
-    report no "6 check-docs after freeze" "$(grep -E '^FAIL' "$work/cd6.out" | head -5)"
+    report no "6 manifest lock" "$(cat "$work/locks6.out")"
+fi
+git reset -q HEAD .doc-locks && git checkout -q -- .doc-locks
+if unlock_cmd .doc-locks "freeze: promote specs/** to hard-locked"; then
+    cat "$work/promotion" >> .doc-locks
+    git add -A
+    if git commit -q -m "freeze" >"$work/commit6.out" 2>&1; then
+        report ok "6a the freeze promotion goes through with make unlock" ""
+    else
+        report no "6a freeze commit" "$(cat "$work/commit6.out")"
+    fi
+else
+    report no "6a unlock .doc-locks" "$(cat "$work/unlock.out")"
+fi
+if check_docs > "$work/cd6.out" 2>&1; then
+    report ok "6b check-docs still passes after the freeze" ""
+else
+    report no "6b check-docs after freeze" "$(grep -E '^FAIL' "$work/cd6.out" | head -5)"
 fi
 s="$(bash "$here/scripts/stage-detect.sh" . | head -1)"
-if [ "$s" = "frozen" ]; then report ok "6b stage-detect says frozen" ""; else report no "6b stage-detect frozen" "said '$s'"; fi
-git add -A && git commit -q -m "freeze" >/dev/null 2>&1
+if [ "$s" = "frozen" ]; then report ok "6c stage-detect says frozen" ""; else report no "6c stage-detect frozen" "said '$s'"; fi
 t="$(python3 scripts/lock-guard.py --tier specs/01-scope-actors.md | cut -f1)"
-if [ "$t" = "hard-locked" ]; then report ok "6c specs/** is hard-locked after the promotion" ""; else report no "6c specs tier" "$t"; fi
+if [ "$t" = "hard-locked" ] && [ "$(git log --oneline | wc -l)" = "3" ]; then
+    report ok "6d specs/** is hard-locked after the committed promotion" ""
+else
+    report no "6d specs tier" "tier=$t commits=$(git log --oneline | wc -l)"
+fi
+
+# the lock layer guards itself: the guard cannot be edited by the diff it judges
+printf '# weakened\n' >> scripts/lock-guard.py
+git add scripts/lock-guard.py
+if check_locks > "$work/locks6e.out" 2>&1; then
+    report no "6e editing the guard without a ceremony" "passed"
+elif grep -q 'scripts/lock-guard.py' "$work/locks6e.out"; then
+    report ok "6e editing scripts/lock-guard.py without a ceremony is blocked" ""
+else
+    report no "6e guard self-protection" "$(cat "$work/locks6e.out")"
+fi
+git reset -q HEAD scripts/lock-guard.py && git checkout -q -- scripts/lock-guard.py
 
 # --- 7. the suite is wired to a real gate: one broken template line fails -------
 

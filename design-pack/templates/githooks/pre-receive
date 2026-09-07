@@ -4,7 +4,9 @@
 # This is the guarantee. `--no-verify` is a client-side flag and cannot reach here.
 #
 # Manifest and guard are read from the revision being replaced, not from the one
-# being pushed, so a push cannot relax a lock and break it in the same breath. A
+# being pushed, so a push cannot relax a lock and break it in the same breath. The
+# pushed manifest is handed to the guard as well, so a push that only relaxes a
+# lock, to use the relaxation in a later push, is refused by the demotion rule. A
 # brand-new ref has nothing to be replaced, so it falls back to what it pushes.
 set -eu
 
@@ -25,8 +27,12 @@ while read -r old new ref; do
     extract "$base" scripts/lock-guard.py "$work/guard.py" ||
         extract "$new" scripts/lock-guard.py "$work/guard.py" || continue
 
+    newman=""
+    if extract "$new" .doc-locks "$work/manifest.new"; then newman="--new-manifest $work/manifest.new"; fi
+
+    # shellcheck disable=SC2086
     if ! git diff --no-color --no-renames --unified=0 "$base" "$new" |
-         python3 "$work/guard.py" --manifest "$work/manifest" --no-token --quiet; then
+         python3 "$work/guard.py" --manifest "$work/manifest" $newman --no-token --quiet; then
         echo "lock-guard: rejected $ref" >&2
         status=1
     fi

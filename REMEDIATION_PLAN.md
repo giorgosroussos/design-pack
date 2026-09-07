@@ -41,7 +41,7 @@ bash design-pack/scripts/test-render.sh
 | --- | --- | --- | --- | --- |
 | W1 | Mechanical bugs (A1–A8) | A — local fixes | ½ day | done |
 | W2 | Render-and-check acceptance suite | D — safety net | ½ day | done |
-| W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | not started |
+| W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | done |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | not started |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | not started |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | not started |
@@ -221,7 +221,7 @@ Acceptance:
 
 ## W3 — The manifest can demote its own locks
 
-Status: not started
+Status: done
 Decision: **approved as specified below** (demotion = violation; guard, hooks and manifest become
 hard-locked at Stage C). Change the Decision line if the owner wants otherwise.
 
@@ -267,17 +267,17 @@ File: `design-pack/templates/scripts/lock-guard.py`
 
 ### Acceptance
 
-- [ ] test: appending a demotion + editing the demoted path in one commit is blocked locally.
-- [ ] test: push 1 (demotion only) is **rejected** by the pre-receive simulation.
-- [ ] test: appending `hard-locked: specs/**` (a promotion) is accepted with no ceremony —
+- [x] test: appending a demotion + editing the demoted path in one commit is blocked locally.
+- [x] test: push 1 (demotion only) is **rejected** by the pre-receive simulation.
+- [x] test: appending `hard-locked: specs/**` (a promotion) is accepted with no ceremony —
       when `.doc-locks` is still append-only in the fixture; and requires `make unlock` once
       the Stage-C manifest makes it hard-locked. Both fixtures covered.
-- [ ] test: editing `scripts/lock-guard.py` without `make unlock` is blocked.
-- [ ] `stages/D-review.md` D4 updated: the freeze runs `make unlock PATH=.doc-locks REASON=...`
+- [x] test: editing `scripts/lock-guard.py` without `make unlock` is blocked.
+- [x] `stages/D-review.md` D4 updated: the freeze runs `make unlock PATH=.doc-locks REASON=...`
       before appending the promotion.
-- [ ] `stages/C-operationalize.md` C1.2 and C1.7, `templates/.doc-locks` comments,
+- [x] `stages/C-operationalize.md` C1.2 and C1.7, `templates/.doc-locks` comments,
       `templates/githooks/README.md`, `DOCUMENTATION.md` §5.1–5.2 updated.
-- [ ] W2 suite still passes.
+- [x] W2 suite still passes.
 
 ---
 
@@ -468,3 +468,34 @@ Append-only. One entry per session per item touched. Form:
   from `templates/Makefile` → cases 1 and 6 fail naming `make rebuild-questions`. Both templates
   restored from git afterwards. All five suites green: 14 + 15 + 31 + 5 + 17 = 82 cases.
 - Left open: nothing. W3 can now change the guard with this net under it.
+
+### 2026-09-08 — W3 — done
+- Changed: `design-pack/templates/scripts/lock-guard.py` — new `demotions()` (probes every glob of
+  both manifests plus every path in the diff; a tier that goes down is a violation whichever
+  glob does it), `check()` takes the new manifest and fails closed when the manifest changes
+  without one; `--staged` judges with `HEAD:.doc-locks` and compares to the index's copy
+  (falls back to the staged copy before the first commit); `--new-manifest` for the remote.
+  `templates/githooks/pre-receive` extracts the pushed manifest and passes it. `templates/.doc-locks`:
+  `scripts/lock-guard.py`, `scripts/unlock.sh`, `.githooks/**` and `.doc-locks` itself are
+  hard-locked; the header explains the demotion rule. Stages: `D-review.md` D4.2 is now
+  `make unlock PATH=.doc-locks` then append; `C-operationalize.md` C1.7 states the
+  self-protection (C1.2 needed no change: the copy step is unchanged). Docs: `githooks/README.md`,
+  `templates/AGENTS.md` `.doc-locks` bullet, `SKILL.md` hard rule, `DOCUMENTATION.md` §5.1–5.2
+  and §11. Tests: `test-lock-guard.sh` +7/7b/7c (demotion locally, demotion-only push rejected,
+  fail closed), +8/8b/8c (guard self-protection, promotion blocked without and accepted with the
+  ceremony), +10 unit asserts (same/broader/narrower glob, one step down, three non-demotions,
+  promotion under an append-only manifest, single demotion violation, fail closed);
+  `test-render.sh` case 6 rewritten — it had passed vacuously because the freeze commit's exit
+  status was never checked; it now performs the D4 ceremony, asserts the commit landed and that
+  the guard cannot be edited without one (6/6a–6e).
+- Proved by: all five suites green — lock-guard 20/20, decisions 15/15, questions 31/31,
+  check-docs 5/5, render 20/20 (91 cases). The review's attacks re-run against the new guard:
+  one-commit demotion+edit → 3 violations (demotion, manifest hard-locked, input hard-locked);
+  two-push demotion → push 1 rejected with `LOCK demotion`; editing the guard → blocked;
+  broader (`free: docs/**`), narrower (`free: docs/inputs/requirements.md`) and one-step
+  (`append-only: docs/inputs/**`) demotions all detected; `hard-locked: specs/**` is not.
+  Mutation: with the pre-W3 guard restored, cases 7, 7b, 7c and the unit block fail; 8x still
+  pass because they rest on the manifest, which is the intended second layer.
+- Left open: nothing. Note for W5: the demotion rule is absolute (no ceremony undoes a tier);
+  the honest-limits text should say that a mistaken promotion is corrected only by an
+  administrator of the remote, deliberately.

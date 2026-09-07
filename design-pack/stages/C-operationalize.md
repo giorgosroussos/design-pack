@@ -62,7 +62,10 @@ as-is). Its statements are `[input]` by declaration. Before Step C1:
    second for the append. The manifest keeps them `free` and `append-only` for that reason.
 7. Do not change a tier in `.doc-locks`. The manifest ships with `specs/` and `QUESTIONS.md`
    free, because Stage D still rewrites spec statements and still moves cards between sections;
-   the freeze promotes them (`stages/D-review.md` Round D4).
+   the freeze promotes them (`stages/D-review.md` Round D4). The lock layer guards itself from
+   the first commit: `scripts/lock-guard.py`, `scripts/unlock.sh`, `.githooks/**` and
+   `.doc-locks` are hard-locked, so a later fix to any of them is a `make unlock`, and the guard
+   refuses any manifest change that lowers a tier (its demotion rule). Say both in the report.
 
 ## Step C2 — Living documents in truthful-empty state
 

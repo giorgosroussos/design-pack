@@ -18,7 +18,14 @@ local check and the server check cannot drift apart.
 `git commit --no-verify` skips the local hook. That is by design in git and
 nothing in a client-side hook can prevent it, so the local hook is fast feedback,
 not a guarantee. The guarantee is `pre-receive` on the remote: it runs where the
-committer's flags do not reach, over the same manifest and the same guard.
+committer's flags do not reach, over the same guard.
+
+Both hooks judge a change with the manifest **before** it: the local hook reads
+`HEAD:.doc-locks`, the remote reads the revision being replaced. The manifest
+after the change is compared to it, and any path whose tier would go down is
+refused (the guard's demotion rule), so a push cannot relax a lock for itself,
+nor for a later push. The guard, this directory and the manifest are themselves
+hard-locked; a change to any of them is a `make unlock`.
 
 Install it by copying `pre-receive` into the remote repository's `hooks/`
 directory and making it executable. A repository with no such remote has fast
