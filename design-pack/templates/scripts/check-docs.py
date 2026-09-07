@@ -42,7 +42,8 @@ Rules
   commands      every `make <target>` listed in AGENTS.md "Commands" is a target
                 in the root Makefile
   agents-size   AGENTS.md stays under its byte ceiling
-  markers       no unrendered `{{...}}` placeholder or `TBD` remains
+  markers       no unrendered `{{...}}` placeholder or `TBD` remains in the
+                documents or in the root Makefile
 
 The report at the end (cards per surface, `[inferred]` statements per file,
 open gaps) is informational; only FAIL lines set the exit code.
@@ -432,6 +433,11 @@ def check_cards(cards):
                 fail("cards", "QUESTIONS.md:%d" % ln, "%s options carry no `→ effect on <surface>` consequence" % q)
         if surface in SURFACES:
             per_surface[surface][1 if section == "Resolved" else 0] += 1
+    numbers = sorted(int(q[2:]) for q in cards)
+    if numbers != list(range(1, len(numbers) + 1)):
+        missing = sorted(set(range(1, (numbers[-1] if numbers else 0) + 1)) - set(numbers))
+        fail("cards", "QUESTIONS.md", "card IDs are not contiguous from Q-001; missing %s"
+             % ", ".join("Q-%03d" % n for n in missing))
     ok("cards", "%d cards" % len(cards))
     return per_surface
 
@@ -633,7 +639,8 @@ def main():
     inferred = check_provenance(root, all_docs, cards, resolved, dids, superseded)
     check_agents(root)
     events, chain_ok = check_log(root)
-    check_markers(root, all_docs)
+    makefile = os.path.join(root, "Makefile")
+    check_markers(root, all_docs + ([makefile] if exists(makefile) else []))
 
     if not args.quiet:
         for n in notes:

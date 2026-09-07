@@ -212,6 +212,37 @@ git reset -q HEAD docs/inputs/requirements.md
 git checkout -- docs/inputs/requirements.md
 chmod 0444 docs/inputs/requirements.md
 
+# --- 4f. the ceremony when the commit deletes the unlocked path ---------------
+# post-commit must consume the token even when there is nothing left to re-lock.
+
+if unlock_cmd docs/inputs/requirements.md "the owner withdrew this page"; then
+    git rm -q -f docs/inputs/requirements.md
+    git commit -q -m "withdraw the page" >"$work/commit4f.out" 2>&1 || printf '  NOTE  4f commit: %s\n' "$(cat "$work/commit4f.out")"
+fi
+if [ -f .doc-unlock ]; then
+    report no "4f ceremony: token consumed when the path is deleted" "the token survived the deleting commit"
+else
+    report ok "4f ceremony: the token is consumed even when the unlocked path is deleted" ""
+fi
+
+# bring the file back (creation under a hard-locked glob needs no ceremony) ...
+git checkout -q HEAD~1 -- docs/inputs/requirements.md
+git add docs/inputs/requirements.md
+git commit -q -m "restore the page" >/dev/null 2>&1
+chmod 0444 docs/inputs/requirements.md
+# ... and prove no stale authorization is left: the next edit is blocked again.
+chmod u+w docs/inputs/requirements.md
+printf 'Edited after the deleting ceremony.\n' >> docs/inputs/requirements.md
+git add docs/inputs/requirements.md
+if guard; then
+    report no "4g ceremony: no authorization survives a deleting commit" "the edit passed without a token"
+else
+    report ok "4g ceremony: no authorization survives a deleting commit" ""
+fi
+git reset -q HEAD docs/inputs/requirements.md
+git checkout -- docs/inputs/requirements.md
+chmod 0444 docs/inputs/requirements.md
+
 # --- 5. --no-verify bypasses the local hook (expected; the remote closes it) ---
 
 sed -i 's/"id":"D-001"/"id":"D-042"/' .log/events.jsonl

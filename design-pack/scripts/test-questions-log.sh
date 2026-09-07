@@ -217,19 +217,19 @@ else
 fi
 
 # the other side of the seam: a successor that does not exist must fail
-event --type card-superseded --set id=Q-002 --set by=Q-009 >/dev/null 2>&1
+event --type card-superseded --set id=Q-002 --set by=Q-004 >/dev/null 2>&1
 event --type card-resolved --set id=Q-002
 rebuild
 if python3 probe.py > "$work/p5c.out" 2>&1; then
     report no "5c supersession by a card that does not exist" "provenance did not complain"
-elif grep -q 'superseded by Q-009, which has no card' "$work/p5c.out"; then
+elif grep -q 'superseded by Q-004, which has no card' "$work/p5c.out"; then
     report ok "5c a successor that does not exist fails provenance" ""
 else
     report no "5c missing successor" "$(cat "$work/p5c.out")"
 fi
 
 card card-opened <<'EOF'
-{"id":"Q-009","title":"Owner reporting depth, reopened","surface":"scope",
+{"id":"Q-004","title":"Owner reporting depth, reopened","surface":"scope",
  "source":"Q-002; the owners asked for the numbers per mechanic after all",
  "question":"Do the owners get per-mechanic numbers in release 1?",
  "options":["A) No → effect on scope: one screen, as before.",
@@ -327,6 +327,11 @@ refuses "a card opened twice" --type card-opened \
     --set id=Q-001 --set title=x --set surface=data --set source=y --set question=z \
     --set 'options=A) one → effect on data: x.
 B) two → effect on data: y.' --set blocks=specification
+refuses "a card whose ID skips ahead (Q-010 when Q-005 is next)" --type card-opened \
+    --set id=Q-010 --set title=x --set surface=data --set source=y --set question=z \
+    --set 'options=A) one → effect on data: x.
+B) two → effect on data: y.' --set blocks=specification
+grep -q 'breaks the sequence' "$work/refuse.out" || report no "8 gap refusal reason" "$(cat "$work/refuse.out")"
 if python3 scripts/rebuild-questions.py --check --quiet >/dev/null 2>&1; then
     report ok "8b the log is unchanged by the refusals" ""
 else
@@ -427,7 +432,7 @@ fi
 
 before="$(bash "$here/scripts/stage-detect.sh" . | head -1)"
 card card-opened <<'EOF'
-{"id":"Q-020","title":"An unrendered blocking card","surface":"security",
+{"id":"Q-005","title":"An unrendered blocking card","surface":"security",
  "source":"appended but deliberately not rebuilt",
  "question":"Does an unrendered event move the stage?",
  "options":["A) It does → effect on security: the gate reacts to what nobody can read.",

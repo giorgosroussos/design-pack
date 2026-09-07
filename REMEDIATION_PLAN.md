@@ -31,13 +31,14 @@ This file is the state. There is no other tracker.
 bash design-pack/scripts/test-lock-guard.sh
 bash design-pack/scripts/test-decisions-log.sh
 bash design-pack/scripts/test-questions-log.sh
+bash design-pack/scripts/test-check-docs.sh
 ```
 
 ## Summary board
 
 | # | Item | Category | Est. | Status |
 | --- | --- | --- | --- | --- |
-| W1 | Mechanical bugs (A1–A8) | A — local fixes | ½ day | not started |
+| W1 | Mechanical bugs (A1–A8) | A — local fixes | ½ day | done |
 | W2 | Render-and-check acceptance suite | D — safety net | ½ day | not started |
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | not started |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | not started |
@@ -52,7 +53,7 @@ claim changes, not the code.
 
 ## W1 — Mechanical bugs
 
-Status: not started
+Status: done
 Decision: none needed.
 
 Eight independent fixes. Each is a few lines; do them in any order, but land the test for each
@@ -79,9 +80,9 @@ git rm -q -f docs/inputs/requirements.md && git commit -qm "delete"
 ```
 
 Acceptance:
-- [ ] new case in `test-lock-guard.sh`: unlock → delete the path in the commit → `.doc-unlock`
+- [x] new case in `test-lock-guard.sh`: unlock → delete the path in the commit → `.doc-unlock`
       is gone → a following commit touching the same path (recreated) is **blocked**.
-- [ ] existing case 4e still passes.
+- [x] existing case 4e still passes.
 
 ### A2 — A gapped or out-of-order `D-NNN` / `Q-NNN` is accepted and reds the gate for good
 
@@ -107,9 +108,9 @@ a D-001; a D-003; echo "exit=$?"   # 0 today; must be 2 after the fix
 ```
 
 Acceptance:
-- [ ] `log-append` exits 2 on `D-003` after `D-001`, and on `Q-002` when no `Q-001` exists.
-- [ ] new cases in `test-decisions-log.sh` and `test-questions-log.sh`.
-- [ ] the four regime records (`decisions-seed.json`, D-001..D-004) still append cleanly.
+- [x] `log-append` exits 2 on `D-003` after `D-001`, and on `Q-002` when no `Q-001` exists.
+- [x] new cases in `test-decisions-log.sh` and `test-questions-log.sh`.
+- [x] the four regime records (`decisions-seed.json`, D-001..D-004) still append cleanly.
 
 ### A3 — `rebuild_command --check --stdout` skips the check
 
@@ -119,7 +120,7 @@ The `--stdout` branch returns 0 before `--check` is evaluated. Handle `--check` 
 the two flags mutually exclusive in argparse.
 
 Acceptance:
-- [ ] `rebuild-decisions.py --check --stdout` on a drifted file exits 1.
+- [x] `rebuild-decisions.py --check --stdout` on a drifted file exits 1.
 
 ### A4 — `D-D-001` in the duplicate-ID message
 
@@ -127,7 +128,7 @@ File: `design-pack/templates/scripts/eventlog.py:283` — drop the `D-` prefix f
 string (the ID already carries it).
 
 Acceptance:
-- [ ] message reads `D-001 added twice (seq N)`.
+- [x] message reads `D-001 added twice (seq N)`.
 
 ### A5 — `adr-approval-changed` attaches to a non-ADR
 
@@ -137,8 +138,8 @@ Fix: when folding `adr-approval-changed`, raise `LogError` unless `entries[index
 Same placement rationale as A2 — `check_appendable` then refuses it at append time.
 
 Acceptance:
-- [ ] `log-append --type adr-approval-changed` against an `implementation` decision exits 2.
-- [ ] case added to `test-decisions-log.sh`.
+- [x] `log-append --type adr-approval-changed` against an `implementation` decision exits 2.
+- [x] case added to `test-decisions-log.sh`.
 
 ### A6 — `read_lines` splits on U+2028 / U+2029 / U+000B
 
@@ -159,8 +160,8 @@ python3 scripts/verify-chain.py   # "broken at record 1" today
 ```
 
 Acceptance:
-- [ ] the reproduction verifies intact.
-- [ ] existing chain tests unchanged (the canonical form is not affected — only line splitting
+- [x] the reproduction verifies intact.
+- [x] existing chain tests unchanged (the canonical form is not affected — only line splitting
       and on-disk escaping).
 
 ### A7 — `markers` rule skips the `Makefile`
@@ -172,7 +173,7 @@ The Makefile is the most placeholder-heavy rendered file (`{{PRODUCT_NAME}}`,
 document — **not** via `ROOT_DOCS`, which would also send it through `check_citations`.
 
 Acceptance:
-- [ ] a Makefile containing `{{X}}` produces `FAIL markers Makefile:N`.
+- [x] a Makefile containing `{{X}}` produces `FAIL markers Makefile:N`.
 
 ### A8 — Broken references in `DOCUMENTATION.md`
 
@@ -181,7 +182,7 @@ exists in this repository (`reference/` lives under `design-pack/`). Fix the pat
 sentence.
 
 Acceptance:
-- [ ] every path named in `DOCUMENTATION.md` exists.
+- [x] every path named in `DOCUMENTATION.md` exists.
 
 ---
 
@@ -429,4 +430,21 @@ Append-only. One entry per session per item touched. Form:
 - Left open: <what remains, or "nothing">
 ```
 
-_No entries yet._
+### 2026-09-07 — W1 — done
+- Changed: `design-pack/templates/githooks/post-commit` (A1: token removed first and
+  unconditionally, re-lock best effort, no `set -e`); `design-pack/templates/scripts/eventlog.py`
+  (A2 contiguity in both projectors, A3 `--check` before `--stdout`, A4 message, A5 approval
+  only on `adr`, A6 `read_lines` splits on `\n` only and `dumps` escapes U+2028/2029/0085);
+  `design-pack/templates/scripts/check-docs.py` (A2 `cards` contiguity, A7 Makefile in `markers`);
+  `DOCUMENTATION.md` (A8 lines 11–13; §11 suite table); `design-pack/SKILL.md` (files table).
+  Tests: `test-lock-guard.sh` +4f/4g, `test-decisions-log.sh` +6/6b/6c/6d,
+  `test-questions-log.sh` +1 refusal in §8, cases 5c/5d/10 now use the next contiguous IDs
+  (Q-004, Q-005 instead of Q-009, Q-020); new `test-check-docs.sh` (5 cases).
+- Proved by: all four suites exit 0 — lock-guard 14/14, decisions 15/15, questions 31/31,
+  check-docs 5/5 (was 53 cases, now 65). Mutation: with the pre-fix `post-commit` restored,
+  case 4f fails and the rest pass, so 4f is the case that pins A1. Each A2–A7 reproduction
+  from the plan re-run against the patched scripts: D-003 after D-001 → exit 2; Q-002 with no
+  Q-001 → exit 2; approval on `implementation` → exit 2; `--check --stdout` on drift → exit 1;
+  U+2028 record → `verify-chain: intact`; `{{X}}` in Makefile → `FAIL markers Makefile:1`.
+- Left open: nothing. Note for W2: `test-check-docs.sh` is the rule-level suite; `test-render.sh`
+  stays the whole-gate suite as planned.

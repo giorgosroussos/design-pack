@@ -198,5 +198,42 @@ else
     report no "4b rebuild after a hand edit" "$(cat "$work/probe4b.out" 2>/dev/null)"
 fi
 
+# --- 6. events the log refuses because no projection could fold them ---------
+# The log holds D-001, D-002 and a supersession; the next decision is D-003.
+
+if append --type decision-added --set id=D-004 --set date=2026-09-04 --set title="Skips ahead" \
+        --set type=implementation --set decision="x." --set why="y." \
+        --set alternatives="z." --set affected_specs="none." > "$work/gap.out" 2>&1; then
+    report no "6 a decision whose ID skips ahead" "D-004 was accepted while D-003 is next"
+elif grep -q 'breaks the sequence' "$work/gap.out"; then
+    report ok "6 a decision whose ID skips ahead is refused (D-004 when D-003 is next)" ""
+else
+    report no "6 gap refusal reason" "$(cat "$work/gap.out")"
+fi
+
+if append --type adr-approval-changed --set id=D-002 --set approval=granted \
+        --set approval_date=2026-09-04 > "$work/adr.out" 2>&1; then
+    report no "6b an approval on a non-ADR" "it attached to an implementation decision"
+elif grep -q 'not adr' "$work/adr.out"; then
+    report ok "6b an owner approval aimed at an implementation decision is refused" ""
+else
+    report no "6b approval refusal reason" "$(cat "$work/adr.out")"
+fi
+
+if [ "$(seqs)" = "1,2,3" ]; then
+    report ok "6c the log is unchanged by the refusals" ""
+else
+    report no "6c refusal side effects" "seqs are $(seqs)"
+fi
+
+# --check must decide before --stdout: printing is not checking
+printf '\ndrift\n' >> DECISIONS.md
+if python3 scripts/rebuild-decisions.py --check --stdout > /dev/null 2>&1; then
+    report no "6d --check --stdout on a drifted file" "exited 0"
+else
+    report ok "6d --check wins over --stdout: a drifted file still exits 1" ""
+fi
+python3 scripts/rebuild-decisions.py --quiet
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

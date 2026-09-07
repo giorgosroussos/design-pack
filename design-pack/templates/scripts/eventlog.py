@@ -96,7 +96,12 @@ def ordered(record):
 
 
 def dumps(record):
-    return json.dumps(ordered(record), sort_keys=False, separators=(",", ":"), ensure_ascii=False)
+    """One line per record on disk. The three non-ASCII line separators that
+    json.dumps leaves raw under ensure_ascii=False are escaped, so any reader
+    that splits on lines still sees one record per line. The hash is computed
+    over the parsed record, so this changes nothing about the chain."""
+    line = json.dumps(ordered(record), sort_keys=False, separators=(",", ":"), ensure_ascii=False)
+    return line.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029").replace("\u0085", "\\u0085")
 
 
 def read_lines(root):
@@ -104,7 +109,14 @@ def read_lines(root):
     if not os.path.isfile(path):
         return []
     with open(path, encoding="utf-8") as fh:
-        return [line for line in fh.read().splitlines()]
+        text = fh.read()
+    # Split on "\n" only. str.splitlines() also breaks on U+2028, U+2029,
+    # U+0085 and U+000B, which a JSON string may legally contain; a record
+    # read as two lines would break its own chain.
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
 
 
 def verify(lines):
@@ -360,7 +372,12 @@ def project_decisions(records):
             entry = dict(payload)
             entry.setdefault("superseded_by", None)
             if entry["id"] in position:
-                raise LogError("D-%s added twice (seq %s)" % (entry["id"], record.get("seq")))
+                raise LogError("%s added twice (seq %s)" % (entry["id"], record.get("seq")))
+            expected = "D-%03d" % (len(entries) + 1)
+            if entry["id"] != expected:
+                raise LogError("%s at seq %s breaks the sequence: the next decision is %s. IDs run "
+                               "contiguously from D-001, and a gap could never be closed on an "
+                               "append-only log" % (entry["id"], record.get("seq"), expected))
             position[entry["id"]] = len(entries)
             entries.append(entry)
             continue
@@ -371,6 +388,9 @@ def project_decisions(records):
         if event_type == "decision-superseded":
             entries[index]["superseded_by"] = payload["by"]
         elif event_type == "adr-approval-changed":
+            if entries[index].get("type") != "adr":
+                raise LogError("adr-approval-changed at seq %s targets %s, whose type is %r, not adr"
+                               % (record.get("seq"), payload["id"], entries[index].get("type")))
             entries[index]["approval"] = payload["approval"]
             entries[index].pop("approval_date", None)
             if payload.get("approval_date"):
@@ -455,6 +475,11 @@ def project_questions(records):
             card = dict(payload)
             if card["id"] in position:
                 raise LogError("%s opened twice (seq %s)" % (card["id"], record.get("seq")))
+            expected = "Q-%03d" % (len(cards) + 1)
+            if card["id"] != expected:
+                raise LogError("%s at seq %s breaks the sequence: the next card is %s. IDs run "
+                               "contiguously from Q-001, and a gap could never be closed on an "
+                               "append-only log" % (card["id"], record.get("seq"), expected))
             card["state"] = "blocking" if card["blocks"] == BLOCKS_SPECIFICATION else "open"
             card["answer"] = None
             card["answer_date"] = None
@@ -558,16 +583,14 @@ def rebuild_command(description, target, render, argv=None):
         sys.stderr.write("rebuild: %s\n" % exc)
         return 3
 
-    if args.stdout:
-        sys.stdout.write(rendered)
-        return 0
-
     path = os.path.join(root, target)
     current = None
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as fh:
             current = fh.read()
 
+    # --check is decided before --stdout: a check that prints instead of
+    # comparing would report success on a drifted file.
     if args.check:
         if current == rendered:
             if not args.quiet:
@@ -579,6 +602,10 @@ def rebuild_command(description, target, render, argv=None):
         for line in list(diff)[:40]:
             sys.stdout.write(line if line.endswith("\n") else line + "\n")
         return 1
+
+    if args.stdout:
+        sys.stdout.write(rendered)
+        return 0
 
     if current == rendered:
         if not args.quiet:

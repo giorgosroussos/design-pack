@@ -1,10 +1,16 @@
 #!/bin/sh
 # Transport only. Consumes the single-use unlock token: one ceremony, one commit.
-set -eu
+#
+# The token is removed first and unconditionally. Re-locking is best effort: the
+# unlocked path may have been deleted or renamed in the very commit the token
+# authorized, and a missing path must not leave the token behind, because a
+# surviving token would authorize the next commit as well.
+set -u
 token=".doc-unlock"
 [ -f "$token" ] || exit 0
-sed -n 's/^path: *//p' "$token" | while IFS= read -r path; do
-    [ -e "$path" ] && chmod 0444 -- "$path"
+paths="$(sed -n 's/^path: *//p' "$token")"
+rm -f -- "$token"
+printf '%s\n' "$paths" | while IFS= read -r path; do
+    [ -n "$path" ] && [ -e "$path" ] && chmod 0444 -- "$path" || true
 done
-rm -f "$token"
 echo "lock-guard: unlock token consumed; the path is read-only again."

@@ -7,9 +7,9 @@ wrote the requirements again.
 It is invoked manually: `/design-pack [target-dir]`. It converses in the owner's language and
 writes every generated file in English. The generated repository never mentions the skill.
 
-- The skill lives in `~/.claude/skills/design-pack/`.
-- The brief it was built from, and the exemplar snapshot it generalizes, live in this
-  repository: `SKILL_PROMPT.md` and `reference/`.
+- Installed, the skill lives in `~/.claude/skills/design-pack/`.
+- Its source is this repository's `design-pack/` directory; the core mechanisms it generalizes
+  from the exemplar are under `design-pack/reference/`.
 
 ---
 
@@ -480,9 +480,10 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
-| `test-lock-guard.sh` | 12 | append-only removals, hard-locked changes, the ceremony end to end, the `--no-verify` bypass and its server-side mirror, plus eleven policy unit cases over crafted diffs |
-| `test-decisions-log.sh` | 11 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, and the refusal to append onto a broken chain |
-| `test-questions-log.sh` | 30 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; and that `stage-detect` reads the projection rather than the log |
+| `test-lock-guard.sh` | 14 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, plus eleven policy unit cases over crafted diffs |
+| `test-decisions-log.sh` | 15 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
+| `test-questions-log.sh` | 31 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
+| `test-check-docs.sh` | 5 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession
