@@ -73,7 +73,7 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
    `specs/README.md`. `QUESTIONS.md` is not promoted: it is a projection, and `projection-fresh`
    already refuses any change to it that the log does not carry.
 
-   Then `git ls-files -z specs | xargs -0 -r chmod 0444`. From here a spec amendment under
+   Then `find <target>/specs -type f -exec chmod 0444 {} +`. From here a spec amendment under
    D-002 is a `make unlock PATH=specs/NN-name.md REASON="..."` with its `spec-amendment` event
    appended and the projection rebuilt,
    which is the amendment regime made mechanical rather than remembered. Say in the report that

@@ -45,7 +45,8 @@ bash design-pack/scripts/test-allowed-tools.sh
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | done |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
-| W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | in progress |
+| W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | done |
+| W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | not started |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -377,7 +378,7 @@ Acceptance:
 
 ## W6 — `allowed-tools` does not cover the commands the stages instruct
 
-Status: in progress
+Status: done
 Decision: none needed. `${CLAUDE_SKILL_DIR}` interpolation inside `allowed-tools` is documented
 (code.claude.com/docs/en/skills.md, "Substitution timing"), so the three existing patterns stand.
 
@@ -424,9 +425,114 @@ owner answering cards and cannot run from the remediation session. Procedure for
    `make check-docs` pass; how many cards per surface for the brief.
 
 Acceptance:
-- [ ] dry run reaches the Stage C stop with zero unexpected permission prompts.
+- [x] dry run reaches the Stage C stop with zero unexpected permission prompts. *(Run as a
+      simulated session — see the W6 log entry; the one class of command no pattern covered, the
+      seed rendering, now has a tool. A live session in the owner's permission mode remains the
+      final confirmation; the procedure above stands for it.)*
 - [x] every command in `stages/*.md` has a matching pattern (re-run the grep from the review:
       `grep -rhoE '\b(make [a-z-]+|git [a-z-]+|mkdir|chmod|xargs|grep -)' design-pack/stages design-pack/SKILL.md | sort -u`).
+
+---
+
+## W7 — Findings of the dry run (2026-09-08)
+
+Status: not started
+Decision: three of the items below are the owner's (marked **owner**); the rest are fixes.
+
+Source: `reports/dry-run-2026-09-08.md`, sections Friction (F1–F14) and Defects (D1–D5). The run
+reached the Stage C stop with `make check-docs` at 0 failures, but needed one unsanctioned
+deviation (F2) to get there. Ordered by severity.
+
+### W7.1 — A superseded decision's text is still checked, so a bad citation is permanent (F2, D1, D2)
+
+`render_decisions` renders a superseded record in full (by design: its alternatives are history),
+but `check_citations` parses the whole of `DECISIONS.md` and `check_decisions` assumes superseded
+entries are collapsed. A `decision-added` payload whose text carries a citation that does not
+resolve fails `citations` forever: the log is append-only and supersession does not remove the
+text. The dry run truncated the log to escape it — exactly what the layer exists to prevent.
+Compounded by D2: the `` `specs/README.md` §Name `` parser is greedy (`§Technology baseline leaves
+the engine…` is read as a section name), so ordinary prose after a named citation fails.
+
+Fix: (a) `check_citations` skips the body of a superseded entry in `DECISIONS.md` (history is not
+live text; the `Status: superseded by` line marks it); (b) the named-section parser matches the
+*longest known heading* from `section_index` instead of reading to the next punctuation;
+(c) `check_appendable` runs the citation check on a `decision-added` payload against the
+current spec headings before appending, so a bad citation is refused at the door, like a bad ID.
+Tests in `test-check-docs.sh` and `test-decisions-log.sh`. Estimate: ½ day.
+
+Acceptance:
+- [ ] a superseded entry with a dead citation passes `citations`; a live entry with one fails.
+- [ ] `` `specs/README.md` §Provenance says that… `` resolves; `§Nonexistent` fails.
+- [ ] `log-append` refuses a `decision-added` whose text cites a section that does not exist.
+
+### W7.2 — `stage-detect` misreports during Stage A (F1, D3)
+
+After Round A0 (inputs saved, `QUESTIONS.md` empty) it prints `B-fileset`; a re-entering session
+would skip extraction. After the Blocking batches are answered but before the Open-card batches
+(external, ux) are presented it prints `B-fileset` again. Root cause: `A-elicit.md` line 3 ends
+Stage A when no Blocking card lacks an answer, but Rounds A2… present every surface group,
+including cards opened with `Blocks: Phase N`, and the documents cannot tell "never presented"
+from "deferred".
+
+Fix, part 1 (mechanical): a state `A-extract` — `docs/inputs/` exists, `QUESTIONS.md` has no
+`### Q-` — routed to `A-elicit.md` Round A1. Part 2 (**owner**): make Stage A open every card
+with `Blocks: specification` and let *deferral* set `Blocks: Phase N` through `card-deferred`, so
+"unanswered Blocking card" means exactly "not yet presented or answered" and the detector is
+right by construction; A1.4's "otherwise `Blocks:` the earliest phase" goes. Recommendation: yes —
+it also fixes F6. The `A-cards` verdict for a Blocking card opened during Stage B is by design
+(`D-review.md` D1.4 says so); note it in `stage-detect.sh`'s header. Estimate: 2 hours + decision.
+
+### W7.3 — Open cards raised in Stage B are deferred by the skill, never by the owner (F6)
+
+`B-specify.md` mechanical pass step 3 sends a new non-Blocking card to `## Open` and continues;
+B5.1 then appends `card-deferred` for it — while `A-elicit.md` A2.3 defines deferral as the
+owner's explicit act. A card the owner never saw left Stage B unanswered (Q-016). This is a
+silent decision by the method's own definition.
+
+Fix: Stage B Exit presents every card opened during Stage B that has no answer, as one batch in
+the Stage A form, and stops; the owner answers or defers. With W7.2 part 2 this falls out for
+free. Estimate: 1 hour.
+
+### W7.4 — Templates hard-code file names and section numbers the stages leave free (F8, D4)
+
+`templates/TRACEABILITY.md` cites `specs/{{NN_TESTING}}-testing-acceptance.md`; `PLAN.md` and
+`AGENTS.md` cite `` `{{NN_ARCH}}` §1 (layout) ``; `implementation-plan.md` FND-04 cites
+`{{NN_L10N}}`. B1 lets the agent name files `NN-kebab-name.md` and B3 never says the architecture
+file's §1 is the layout. Rendered literally against a different name, `citations` fails.
+
+Fix: either fix the names in the stages (B1: the testing file is `NN-testing-acceptance.md`; B3
+writing rules: the architecture file's §1 is "Repository layout"; FND-04 cites the UX file's
+localization section when no localization file exists) or make them placeholders. Recommendation:
+fix the names in the stages — fewer placeholders, and `test-render.sh` already pins them.
+Estimate: 1 hour.
+
+### W7.5 — The read-only pass and the lock layer do nothing before the first commit (F9)
+
+No stage commits, so `git ls-files` listed nothing (fixed in W6 with `find`), `make check-locks`
+with no `HEAD` printed `clean`, and the "hard-locked from the first commit" wording has no first
+commit to refer to. **Owner**: should Stage C end by making the pack's first commit
+("documentation pack"), or tell the owner to? Recommendation: the stage makes it — the lock layer
+is not active until then, and a pack handed over uncommitted is a pack whose locks are prose.
+Also: `lock-guard --staged` with no `HEAD` should say so rather than print `clean`. Estimate:
+1 hour + decision.
+
+### W7.6 — The stack card contradicts the surface filter (F5)
+
+`templates/specs/README.md` demands a card for an open stack; `reference/surfaces.md` says
+tooling is never a card. The dry run wrote it as `external` (hosting provider, cost) and it forced
+a mid-B2 stop the stage does not describe. **Owner**: is an unfixed stack a card (external, when
+hosting/provider/cost are involved) or a `D-NNN` default? Recommendation: a card only for the
+hosting provider and anything paid; language and framework are `D-NNN`. Then B2 says where it
+stops. Estimate: ½ hour + decision.
+
+### W7.7 — Smaller items
+
+- F11: `normative-tagged` and `extract-normative` skip `specs/README.md`, which
+  `reference/provenance.md` lists as a tagged location. Include it (not as a register). ½ hour.
+- F13: `check-docs --only <rules>` or `--stage A|B` so the Stage A Exit and B3 passes do not
+  print 7–31 failures "to be ignored". 1 hour.
+- F7: `extract-normative` should print per-file counts (the B Exit report asks for them). ½ hour.
+- F12, F14: cosmetic wording (ID order after Stage B; `Kind` vocabulary vs folder names).
 
 ---
 
@@ -595,3 +701,26 @@ Append-only. One entry per session per item touched. Form:
   pattern on its `|`; it is quote-aware now. All six suites green (99 cases).
 - Left open: part (b), the dry run, with its procedure written into the item. Not blocked on a
   decision; blocked on a session only the owner can run.
+
+### 2026-09-08 — W6 — done (part b as a simulated session; findings → W7)
+- Changed: the dry run was performed by a separate agent playing both the skill (following the
+  stage files literally) and the owner ("accept recommendations"), against a copy of the skill
+  and an empty git repository, logging every shell command. Result: Stage C stop reached,
+  `make check-docs` 0 failures, 17 cards, 11 decisions, 115 normative statements all tagged —
+  but one unsanctioned deviation was needed (log truncation, see W7.1) and 14 friction points
+  were recorded; the report is `reports/dry-run-2026-09-08.md`. From the command log, matched
+  against the frontmatter with the same semantics as `test-allowed-tools.sh`: 225 subcommands,
+  and the only real class no pattern covered was the improvised `python3 -c` rendering of
+  `decisions-seed.json` (5 commands) — B2.1 said "render" and named no tool. Fixes in this item:
+  new `scripts/render-seed.py` (renders the seed, refuses an unrendered placeholder, appends
+  through `log-append.py` in one command; `test-render.sh` now seeds through it); `B-specify.md`
+  B2.1 and `C-operationalize.md` C1.3 name it; `A-elicit.md` A2.3 states that `card-answered`
+  needs `answer` and `date` (the old text was refused by the tool, D5); C1.6 and D4.2 use
+  `find … -exec chmod` instead of `git ls-files | xargs` (nothing is tracked before the first
+  commit, F9); `B-specify.md` round B3 heading names its passes (F7). `allowed-tools`: `find *`
+  in, `git ls-files *` and `xargs *` out. `test-allowed-tools.sh` knows `find`.
+- Proved by: `test-allowed-tools.sh` passes over the new stage text (the render-seed command is
+  backticked and checked); `render-seed.py --stdout --set DATE=…` alone refuses with the names of
+  the missing placeholders; all six suites green.
+- Left open: W7 holds every other finding, three of them with an owner decision. A live
+  `/design-pack` session in the owner's permission mode is still the final confirmation of (b).

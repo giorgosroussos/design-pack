@@ -48,15 +48,17 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
    import it, so it has to sit beside them. Render `templates/log-README.md` into
    `<target>/.log/README.md`. If the target has no `.log/events.jsonl` — an adopted pack that
    never ran Stage B — create it empty and seed the five regime records exactly as
-   `stages/B-specify.md` round B2 does, then rebuild the projection.
+   `stages/B-specify.md` round B2 does (`${CLAUDE_SKILL_DIR}/scripts/render-seed.py`), then
+   rebuild the projection.
 4. Render `Makefile` from its template (product name; keep or drop the contract-drift target).
 5. Render `CLAUDE.md`, `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` and `README.md` from their
    templates. Placeholders only; no new rules.
 6. Activate the layer, when the target is a git repository:
    `cd <target> && make install-hooks` (which is `git config core.hooksPath .githooks` plus the
    exec bits), then make the hard-locked files read-only:
-   `git ls-files -z docs/inputs | xargs -0 -r chmod 0444`. An accidental in-session overwrite
-   then fails at the filesystem before it ever reaches a commit. Git records only the exec bit,
+   `find <target>/docs/inputs -type f -exec chmod 0444 {} +`. An accidental in-session overwrite
+   then fails at the filesystem before it ever reaches a commit. (Every file, not only tracked
+   ones: nothing is tracked yet, because no stage commits; the owner makes the first commit.) Git records only the exec bit,
    so the mode is local to the clone and `make install-hooks` runs again after every clone; the
    hooks, not the mode bits, are the enforcement. If the target is not a git repository, say so in
    the report and leave the hooks uninstalled rather than initializing one. Never `chmod`

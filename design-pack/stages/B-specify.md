@@ -29,18 +29,19 @@ produces a Blocking card.
      `mkdir -p <target>/.log && touch <target>/.log/events.jsonl`. An empty log is a valid genesis
      state: `seq` 1 links to 64 zeros, and `verify-chain` accepts it. Both streams share the one
      file and are told apart by `stream`.
-   - For each entry of `${CLAUDE_SKILL_DIR}/templates/decisions-seed.json` under `events`, in
-     order, render its placeholders (its `notes` say how D-003 reads with and without
-     non-authoritative inputs) and append it:
-     `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/log-append.py --root <target> --type decision-added --payload-file -`
-     with the rendered payload object on stdin. The tool refuses a payload it cannot render.
+   - Render and append the regime records of `${CLAUDE_SKILL_DIR}/templates/decisions-seed.json`
+     in one command:
+     `python3 ${CLAUDE_SKILL_DIR}/scripts/render-seed.py --root <target> --set DATE=<date> --set NN_TRACE=<NN> --set NN_REGISTER=<NN> --set NN_PLAN=<NN> --set NN_PLAYBOOK=<NN> --set REGISTER_CC_SECTION=6 --set D003_DECISION="..." --set D003_WHY="..." --set D003_ALTERNATIVES="..."`
+     (the seed's `notes` say how D-003 reads with and without non-authoritative inputs). The tool
+     refuses a placeholder it was not given a value for, and stops at the first record
+     `log-append.py` refuses.
    - `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/rebuild-decisions.py --root <target>`.
 2. Render `specs/README.md` from its template with the approved file table. Status stays
    `Draft`. The technology baseline comes from the constraints (`[input]`) or from answered
    cards (`[Q-NNN]`); a stack element nobody fixed is a card, not a guess.
 3. Run the mechanical pass (below).
 
-## Rounds B3… — Domain files, at most four per round
+## Round B3 — Domain files, at most four per pass (B3.1, B3.2, …)
 
 Order: scope and actors first, then architecture, then domain model, then security, then the
 rest in dependency order, testing and acceptance last among the domain files.

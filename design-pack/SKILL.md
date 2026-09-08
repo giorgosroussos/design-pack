@@ -30,8 +30,7 @@ allowed-tools:
   - Bash(cp *)
   - Bash(chmod *)
   - Bash(git config core.hooksPath*)
-  - Bash(git ls-files *)
-  - Bash(xargs *)
+  - Bash(find *)
   - Bash(grep *)
 ---
 
@@ -166,6 +165,7 @@ raises it before that phase. Silent decision is the only unacceptable state.
 | `scripts/test-render.sh` | renders every template for a fixture product and proves the result passes the whole gate, the lock layer and `stage-detect` |
 | `scripts/test-allowed-tools.sh` | every shell command the stage files instruct matches a `Bash(...)` pattern of this file's `allowed-tools`, subcommand by subcommand |
 | `scripts/extract-normative.py` | lists normative statements with provenance; used after every writing round and as hunter input |
+| `scripts/render-seed.py` | renders `templates/decisions-seed.json` and appends the regime records through `log-append.py`, in one command |
 | `scripts/stage-detect.sh` | derives the stage from the target repository |
 
 ## At every stop

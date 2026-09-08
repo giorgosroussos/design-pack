@@ -64,9 +64,10 @@ in rounds; every round ends by stopping and waiting for the owner.
    `reference/decision-card.md` §Ordering and batches, cards in full.
 2. Stop. Wait for the owner.
 3. Record answers as events, one `card-answered` per card, then rebuild
-   (`reference/decision-card.md` §Recording answers). "Accept recommendations" is
-   `--set recommendation_accepted=true` on each card of the batch. A card the owner explicitly
-   defers gets no answer: append `card-deferred` with a `blocks` naming the phase, which moves it
+   (`reference/decision-card.md` §Recording answers). Every `card-answered` needs `answer` (the
+   letter of the chosen option) and `date`; "Accept recommendations" is one event per card of the
+   batch with the recommended letter as the answer and `--set recommendation_accepted=true` as
+   well. A card the owner explicitly defers gets no answer: append `card-deferred` with a `blocks` naming the phase, which moves it
    to `## Open`; say so in the report.
 4. If an answer invalidates or creates another card, write it now, in the same surface group,
    with the next free ID. It joins the next batch.

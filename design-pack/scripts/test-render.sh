@@ -318,24 +318,13 @@ PYEOF
 append() { python3 scripts/log-append.py --quiet "$@" || { printf '  FAIL  seed: log-append refused %s\n' "$*"; exit 1; }; }
 
 DATE=2026-09-08
-python3 - "$tpl/decisions-seed.json" <<'PYEOF' > "$work/seed.jsonl"
-import json, sys
-seed = json.load(open(sys.argv[1], encoding="utf-8"))
-values = {"{{DATE}}": "2026-09-08", "{{NN_TRACE}}": "05", "{{NN_REGISTER}}": "06", "{{NN_PLAN}}": "07", "{{NN_PLAYBOOK}}": "08",
-          "{{REGISTER_CC_SECTION}}": "6",
-          "{{D003_DECISION}}": "No non-authoritative input was received. Any mockup, competitor reference or prior draft added later receives an authority row in docs/inputs/README.md and a superseding entry before an agent may use it.",
-          "{{D003_WHY}}": "an input without a declared authority level becomes a requirements source by default, silently.",
-          "{{D003_ALTERNATIVES}}": "treat all inputs as authoritative (rejected: direction and requirements would blend)."}
-for event in seed["events"]:
-    text = json.dumps(event, ensure_ascii=False)
-    for k, v in values.items():
-        text = text.replace(k, v)
-    assert "{{" not in text, text
-    print(text)
-PYEOF
-while IFS= read -r line; do
-    printf '%s' "$line" | append --type decision-added --payload-file -
-done < "$work/seed.jsonl"
+# the five regime records, through the skill's own renderer (Stage B round B2)
+python3 "$here/scripts/render-seed.py" --root . --quiet --set DATE=$DATE --set NN_TRACE=05 --set NN_REGISTER=06 \
+    --set NN_PLAN=07 --set NN_PLAYBOOK=08 --set REGISTER_CC_SECTION=6 \
+    --set D003_DECISION="No non-authoritative input was received. Any mockup, competitor reference or prior draft added later receives an authority row in docs/inputs/README.md and a superseding entry before an agent may use it." \
+    --set D003_WHY="an input without a declared authority level becomes a requirements source by default, silently." \
+    --set D003_ALTERNATIVES="treat all inputs as authoritative (rejected: direction and requirements would blend)." \
+    || { printf '  FAIL  seed: render-seed.py failed\n'; exit 1; }
 
 append --stream questions --type card-opened --payload-file - <<'EOF'
 {"id":"Q-001","title":"Notebook sharing","surface":"security","source":"`docs/inputs/requirements.md`: \"just me, no sharing\"",

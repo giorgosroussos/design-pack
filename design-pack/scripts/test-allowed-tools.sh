@@ -61,7 +61,7 @@ sources = sorted(glob.glob(os.path.join(here, "stages", "*.md"))) + [os.path.joi
 commands = set()
 for path in sources:
     text = open(path, encoding="utf-8").read()
-    for m in re.finditer(r"`((?:cd |bash |python3 |make |git |mkdir |touch |cp |chmod |grep |xargs |sh )[^`]*)`", text):
+    for m in re.finditer(r"`((?:cd |bash |python3 |make |git |mkdir |touch |cp |chmod |grep |xargs |find |sh )[^`]*)`", text):
         commands.add((os.path.relpath(path, here), m.group(1)))
 
 bad, total = [], 0
