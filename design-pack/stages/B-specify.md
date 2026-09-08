@@ -26,7 +26,7 @@ produces a Blocking card.
 1. Create the event log and seed the regime records. The log is the source of truth for agent
    decisions; `DECISIONS.md` is its projection and is never hand-written.
    - The log already exists from Stage A round A0; create it if this pack skipped Stage A:
-     `mkdir -p <target>/.log && : > <target>/.log/events.jsonl`. An empty log is a valid genesis
+     `mkdir -p <target>/.log && touch <target>/.log/events.jsonl`. An empty log is a valid genesis
      state: `seq` 1 links to 64 zeros, and `verify-chain` accepts it. Both streams share the one
      file and are told apart by `stream`.
    - For each entry of `${CLAUDE_SKILL_DIR}/templates/decisions-seed.json` under `events`, in

@@ -33,6 +33,7 @@ bash design-pack/scripts/test-decisions-log.sh
 bash design-pack/scripts/test-questions-log.sh
 bash design-pack/scripts/test-check-docs.sh
 bash design-pack/scripts/test-render.sh
+bash design-pack/scripts/test-allowed-tools.sh
 ```
 
 ## Summary board
@@ -44,7 +45,7 @@ bash design-pack/scripts/test-render.sh
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | done |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
-| W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | not started |
+| W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | in progress |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -376,9 +377,9 @@ Acceptance:
 
 ## W6 — `allowed-tools` does not cover the commands the stages instruct
 
-Status: not started
-Decision: none needed; verify `${CLAUDE_SKILL_DIR}` interpolation empirically before choosing
-the pattern form.
+Status: in progress
+Decision: none needed. `${CLAUDE_SKILL_DIR}` interpolation inside `allowed-tools` is documented
+(code.claude.com/docs/en/skills.md, "Substitution timing"), so the three existing patterns stand.
 
 `SKILL.md` allows five Bash patterns. The stage files instruct: `chmod`, `git config`,
 `git ls-files`, `mkdir -p`, `xargs`, `make install-hooks`, `make check-locks`,
@@ -407,9 +408,24 @@ through Stage C at least, noting every permission prompt that still appears. If 
 `${CLAUDE_SKILL_DIR}` patterns do not interpolate, every script call prompts; in that case
 replace them with the expanded path or with `Bash(python3 */design-pack/*)`.
 
+Part (a), the list, is done; part (b), the dry run, needs a live `/design-pack` session with an
+owner answering cards and cannot run from the remediation session. Procedure for (b):
+
+1. Install: `mkdir -p ~/.claude/skills && cp -r design-pack ~/.claude/skills/design-pack`.
+2. `mkdir -p ~/tmp/trial && cd ~/tmp/trial && git init`, start Claude Code there in the default
+   (prompting) permission mode, `/design-pack .`, paste the pottery brief from
+   `design-pack-overview.md`.
+3. Answer every batch with "accept recommendations". Note **every** permission prompt: the
+   exact command shown. Continue through Stage B and the Stage C stop.
+4. Each prompt is a finding: either a command the stages instruct without a pattern (add the
+   pattern **and** a fixture in `test-allowed-tools.sh` so it would have caught it), or a command
+   the skill improvised that the stages do not instruct (fix the stage text instead).
+5. Also record: does `stage-detect` report the expected stage at each stop; does the final
+   `make check-docs` pass; how many cards per surface for the brief.
+
 Acceptance:
 - [ ] dry run reaches the Stage C stop with zero unexpected permission prompts.
-- [ ] every command in `stages/*.md` has a matching pattern (re-run the grep from the review:
+- [x] every command in `stages/*.md` has a matching pattern (re-run the grep from the review:
       `grep -rhoE '\b(make [a-z-]+|git [a-z-]+|mkdir|chmod|xargs|grep -)' design-pack/stages design-pack/SKILL.md | sort -u`).
 
 ---
@@ -556,3 +572,26 @@ Append-only. One entry per session per item touched. Form:
   whose body now states the limits in the same breath. All five suites green (98 cases);
   `test-render.sh` case 3b (no skill reference in the rendered pack) unaffected.
 - Left open: nothing. Signed unlock records remain out of scope by the owner's decision.
+
+### 2026-09-08 — W6 — in progress (part a done; part b needs a live session)
+- Changed: `design-pack/SKILL.md` `allowed-tools` — 20 `Bash(...)` patterns (was 5): the copied
+  tools inside the target (`python3 scripts/*`), the seven `make` targets the skill runs, and
+  the intake/asset commands the stages instruct (`cd`, `mkdir`, `touch`, `cp`, `chmod`,
+  `git config core.hooksPath*`, `git ls-files *`, `xargs *`, `grep *`) — each named because
+  Claude Code matches every subcommand of a `&&` or a pipe on its own. `stages/A-elicit.md` A0.3
+  and `stages/B-specify.md` B2.1: `: > events.jsonl` (a shell builtin no pattern covers cleanly)
+  became `touch`. New `scripts/test-allowed-tools.sh`: extracts every backticked command from
+  `stages/*.md` and `SKILL.md`, splits compound commands outside quotes, substitutes
+  `${CLAUDE_SKILL_DIR}` and the `<target>`-style placeholders, and matches each subcommand
+  against the frontmatter with the documented glob semantics. Listed in `SKILL.md` and
+  `DOCUMENTATION.md` §11.
+- Proved by: the Claude Code documentation (via the claude-code-guide agent): `${CLAUDE_SKILL_DIR}`
+  is substituted inside `allowed-tools`; `Bash(x *)` is a glob that also matches the bare `x`;
+  a pattern without `*` is exact; each subcommand of a compound command must match
+  independently; `allowed-tools` pre-approves for the skill's turn. `test-allowed-tools.sh`:
+  42 instructed subcommands from 6 sources, all matched. Mutation: deleting `Bash(xargs *)`
+  fails naming the two `git ls-files … | xargs …` lines; deleting `Bash(cd *)` fails naming the
+  two `cd <target> && make …` lines. First version of the splitter broke a quoted `grep -E 'a|b'`
+  pattern on its `|`; it is quote-aware now. All six suites green (99 cases).
+- Left open: part (b), the dry run, with its procedure written into the item. Not blocked on a
+  decision; blocked on a session only the owner can run.

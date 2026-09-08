@@ -18,7 +18,7 @@ in rounds; every round ends by stopping and waiting for the owner.
    intent are authoritative. Mockups, competitor references and prior drafts are
    non-authoritative unless the owner says otherwise.
 3. Render `docs/inputs/README.md` from the template. Create the event log and its projection:
-   `mkdir -p <target>/.log && : > <target>/.log/events.jsonl` (an empty log is a valid genesis
+   `mkdir -p <target>/.log && touch <target>/.log/events.jsonl` (an empty log is a valid genesis
    state), then `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/rebuild-questions.py --root <target>`, which
    writes `QUESTIONS.md` with its sections empty. `QUESTIONS.md` is a projection from here on and
    is never edited by hand: every card, answer, deferral, resolution and supersession is an event.
