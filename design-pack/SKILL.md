@@ -88,7 +88,10 @@ raises it before that phase. Silent decision is the only unacceptable state.
   agent must remember; `check-docs` cannot see them either, because both are properties of a
   diff and not of a snapshot. `.doc-locks` declares the tier of every path, and
   `templates/scripts/lock-guard.py` reads the diff from `.githooks/pre-commit` locally and from
-  the pre-receive mirror on the remote, which is the bypass-proof half. Tiers only go up: the
+  the pre-receive mirror on the remote, which `--no-verify` cannot reach. What the remote holds
+  is that no locked change lands without a recorded reason for that path; the reason is
+  self-asserted, so the ceremony is an audit trail, not an approval gate, and the pack's
+  documents say so rather than more. Tiers only go up: the
   guard judges a change with the manifest before it and refuses any change that lowers a tier,
   and the manifest, the guard and the hooks are hard-locked from the first commit. A hard-locked file
   changes only through `make unlock PATH=... REASON="..."`, recorded in `UNLOCKS.md` and good

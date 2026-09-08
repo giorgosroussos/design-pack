@@ -43,7 +43,7 @@ bash design-pack/scripts/test-render.sh
 | W2 | Render-and-check acceptance suite | D — safety net | ½ day | done |
 | W3 | Manifest demotion guard + self-protection | B — enforcement | 1 day | done |
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
-| W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | not started |
+| W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | not started |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
@@ -343,7 +343,7 @@ summary (informational), and never fails on them.
 
 ## W5 — Honest limits: the unlock record is an audit trail, not authorization
 
-Status: not started
+Status: done
 Decision: **option 1 — documentation only.** Signed unlocks (option 2) change the threat model
 and add key management; not pursued unless the owner reopens this.
 
@@ -369,8 +369,8 @@ Edits:
   add one line that the unlock ledger does not either.
 
 Acceptance:
-- [ ] `grep -rn "guarantee" DOCUMENTATION.md design-pack/` — every remaining use is accurate.
-- [ ] W2 leakage greps unaffected.
+- [x] `grep -rn "guarantee" DOCUMENTATION.md design-pack/` — every remaining use is accurate.
+- [x] W2 leakage greps unaffected.
 
 ---
 
@@ -535,3 +535,24 @@ Append-only. One entry per session per item touched. Form:
   `extract-normative --untagged` on it lists 0, where it listed 20 before the template fixes.
   All five suites green: 20 + 15 + 31 + 12 + 20 = 98 cases.
 - Left open: nothing.
+
+### 2026-09-08 — W5 — done (option 1, documentation only)
+- Changed: `DOCUMENTATION.md` §5.2 — "the guarantee" → "the enforcement", plus a new paragraph
+  *What the remote does and does not guarantee* (recorded reason for the exact path, no lost
+  append-only line, no lowered tier; not who wrote the reason; the demotion rule as the one
+  absolute, undone only by a remote administrator); §5.3 "Two authorization paths" → "Two
+  evidence paths". `design-pack-overview.md` honest-limits paragraph: the unlock ceremony has the
+  same shape as the chain (audit trail, not approval gate) and tiers only go up.
+  `templates/githooks/README.md` "Why both" and the install note; `templates/githooks/pre-receive`
+  header; `templates/scripts/lock-guard.py` docstring ("authorized by evidence…, not proof of who
+  approved it"); `templates/UNLOCKS.md` notes and body ("an audit trail, not an approval gate");
+  `templates/log-README.md` (the ledger does not authenticate either); `stages/C-operationalize.md`
+  C1.6 and `SKILL.md` hard rule ("which `--no-verify` cannot reach … the reason is self-asserted").
+  No code path changed; the guard's identifiers (`authorized`, `authorized_from_diff`) keep their
+  names.
+- Proved by: `grep -rn -i guarantee` over docs and templates — every remaining use is either the
+  chain's own accurate statement (what it guarantees / does not guarantee authorship), the new
+  limits paragraph, or the overview's section title "Why 'locked' is a guarantee, not a note",
+  whose body now states the limits in the same breath. All five suites green (98 cases);
+  `test-render.sh` case 3b (no skill reference in the rendered pack) unaffected.
+- Left open: nothing. Signed unlock records remain out of scope by the owner's decision.

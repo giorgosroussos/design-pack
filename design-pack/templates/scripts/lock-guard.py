@@ -50,13 +50,19 @@ The manifest that judges a change is the one BEFORE the change (HEAD, or the
 revision being replaced), never the one the change proposes; otherwise a commit
 could relax a lock and use the relaxation in the same breath.
 
-Authorization for a hard-locked path comes from either of two places, both
+A hard-locked path is authorized by evidence from either of two places, both
 written by `make unlock`:
 
   * the single-use token `.doc-unlock` (untracked, consumed by the next commit),
     which is what the local pre-commit hook sees, and
   * an unlock record added to `UNLOCKS.md` in the same diff, which is what lets
-    a server-side hook authorize a push whose token it never saw.
+    a server-side hook accept a push whose token it never saw.
+
+Either is evidence that a reason was recorded for exactly that path, not proof of
+who approved it: the record is a line of text that whoever can push can write.
+The guard makes locked changes impossible to make silently; it does not
+authenticate them. That is the threat model of the whole layer (an agent
+drifting, not a committer forging), and the honest limit of it.
 
 Exit status: 0 clean, 1 on any violation, 2 on a usage or manifest error.
 """

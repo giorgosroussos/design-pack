@@ -1,7 +1,8 @@
 #!/bin/sh
 # Server-side mirror of .githooks/pre-commit. Not installed by `make install-hooks`:
 # copy it into the remote repository as `hooks/pre-receive` and make it executable.
-# This is the guarantee. `--no-verify` is a client-side flag and cannot reach here.
+# This is the enforcement. `--no-verify` is a client-side flag and cannot reach here. It
+# checks that every locked change carries a recorded reason, not who wrote the reason.
 #
 # Manifest and guard are read from the revision being replaced, not from the one
 # being pushed, so a push cannot relax a lock and break it in the same breath. The

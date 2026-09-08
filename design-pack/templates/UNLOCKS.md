@@ -1,15 +1,15 @@
 <!-- TEMPLATE NOTES (delete this block when rendering)
 Seeded empty in Stage C, alongside .doc-locks and scripts/lock-guard.py. Append-only
 by manifest rule. Records are written by scripts/unlock.sh, never by hand; the guard
-reads the added lines of this file to authorize a hard-locked change in a push it did
-not witness locally, so the machine-readable form matters.
+reads the added lines of this file as the evidence that lets a hard-locked change through
+in a push it did not witness locally, so the machine-readable form matters.
 No placeholders.
 -->
 # UNLOCKS
 
 One line per ceremonial unlock of a hard-locked path, appended by `make unlock`.
 
-A hard-locked file cannot be changed by an ordinary commit. `make unlock PATH=<path> REASON="..."` records the intent here, makes the file writable and authorizes exactly that path for exactly one commit. The record and the change it permits travel in the same commit, which is what lets the remote verify a push it did not witness locally: the guard reads the lines added to this file.
+A hard-locked file cannot be changed by an ordinary commit. `make unlock PATH=<path> REASON="..."` records the intent here, makes the file writable and lets exactly that path change in exactly one commit. The record and the change it permits travel in the same commit, which is what lets the remote accept a push it did not witness locally: the guard reads the lines added to this file. This file is an audit trail, not an approval gate: it proves that every change to a locked file came with a who, a when and a why, not that anyone but the committer agreed to it.
 
 Format, machine-read by `scripts/lock-guard.py`:
 

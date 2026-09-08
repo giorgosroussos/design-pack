@@ -78,7 +78,12 @@ failing on them, because that deferral is the owner's to make.
 **Honest limits, stated up front.** The hash chain detects any edit to history but does not
 authenticate authorship — it defends against accidental rewrites and silent drift, not a
 determined adversary. Local git hooks can be bypassed with `--no-verify`; the server-side
-mirror on the remote is the half that cannot. And the enforcement only becomes active once the
+mirror on the remote is the half that cannot. The unlock ceremony has the same shape: the
+remote guarantees that every change to a locked file carries a recorded reason for exactly that
+file, not that anyone but the committer approved it — the record is a line of text, and whoever
+can push can write it, so it is an audit trail rather than an approval gate. Lock tiers only ever
+go up, with no ceremony to lower one; a promotion made by mistake is undone only by an
+administrator of the remote, deliberately. And the enforcement only becomes active once the
 target directory is a git repository — before that, the policy is described correctly but
 nothing enforces it.
 

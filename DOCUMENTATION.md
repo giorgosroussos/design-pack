@@ -233,13 +233,25 @@ drift apart:
 | `pre-receive` | on the remote | the same guard over the pushed diff |
 
 `git commit --no-verify` skips the local hook; nothing in a client-side hook can prevent that.
-The local hook is fast feedback, **the pre-receive mirror on the remote is the guarantee** — it
+The local hook is fast feedback; **the pre-receive mirror on the remote is the enforcement** — it
 runs where the committer's flags do not reach. Both read the manifest that judges a change from
 *before* it (`HEAD`, or the revision being replaced), never from the change itself, and hand the
 guard the manifest *after* it for the demotion rule — so a push cannot relax a lock and break it
 in the same breath, nor relax it in one push and use the relaxation in the next. A repository
-without such a remote has feedback and no guarantee, and should say so rather than assume the
+without such a remote has feedback and no enforcement, and should say so rather than assume the
 locks hold.
+
+**What the remote does and does not guarantee.** It guarantees that no hard-locked path changes
+without a reason for that exact path travelling in the same change, that no append-only file
+loses a line, and that no tier is ever lowered. It does **not** guarantee that the reason was
+anyone's but the committer's: the record in `UNLOCKS.md` is a line of text, and whoever can push
+can write it. The ceremony is therefore an audit trail — nothing changes silently, and every
+change to a locked file names a who, a when and a why — not an approval gate. That matches the
+threat model of the whole layer: an agent drifting, not a committer forging. Approval of a change
+is what the owner reads in `UNLOCKS.md` and the `adr` events afterwards, and signing the records
+would be a different mechanism. The demotion rule is the one absolute: no ceremony lowers a tier,
+so a promotion made by mistake is undone only by an administrator of the remote, deliberately,
+outside the tooling.
 
 ### 5.3 The unlock ceremony
 
@@ -254,8 +266,9 @@ stages it so the change and its reason travel in one commit, makes the file writ
 a single-use token the guard accepts for exactly that path. The next commit consumes it: the file
 returns to `0444` and the token is deleted. One ceremony, one deliberate change.
 
-Two authorization paths exist because the server never sees the token: the token covers the local
-hook, and the `UNLOCKS.md` record added in the same diff covers the push. Stage C also sets the
+Two evidence paths exist because the server never sees the token: the token satisfies the local
+hook, and the `UNLOCKS.md` record added in the same diff satisfies the push (see the limits above:
+it is evidence that a reason was recorded, not proof of who approved it). Stage C also sets the
 hard-locked files read-only, so an accidental in-session overwrite fails at the filesystem before
 it reaches a commit. Git records only the exec bit, so that mode is local to the clone and
 `make install-hooks` runs once per clone; the hooks, not the mode bits, are the enforcement.

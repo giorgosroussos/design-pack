@@ -58,7 +58,7 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
    `git ls-files -z docs/inputs | xargs -0 -r chmod 0444`. An accidental in-session overwrite
    then fails at the filesystem before it ever reaches a commit. Git records only the exec bit,
    so the mode is local to the clone and `make install-hooks` runs again after every clone; the
-   hooks, not the mode bits, are the guarantee. If the target is not a git repository, say so in
+   hooks, not the mode bits, are the enforcement. If the target is not a git repository, say so in
    the report and leave the hooks uninstalled rather than initializing one. Never `chmod`
    `DECISIONS.md` or `.log/events.jsonl`: the first has to stay writable for the rebuild, the
    second for the append. The manifest keeps them `free` and `append-only` for that reason.

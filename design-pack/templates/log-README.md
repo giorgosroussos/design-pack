@@ -36,7 +36,7 @@ Both streams share this one file and one contiguous `seq`; each projection folds
 
 **It guarantees**: any change to a record already in the log is detectable. Editing one character changes that record's hash, and every later record's `prev` stops matching, so `make verify-chain` names the first broken link. Removing a line is caught earlier still, by the append-only rule in `.doc-locks`, which the pre-commit and pre-receive hooks enforce.
 
-**It does not guarantee authorship.** Anyone who can run this tooling can write a well-formed new record, and anyone who can rewrite the file can rewrite the chain from a chosen point and recompute every hash after it. The threat model is an agent editing history by accident, and a silent rewrite passing unnoticed in review. It is not a motivated adversary. Signing the records, or keeping the head hash somewhere the repository cannot reach, would be a different mechanism; this is not it.
+**It does not guarantee authorship.** Anyone who can run this tooling can write a well-formed new record, and anyone who can rewrite the file can rewrite the chain from a chosen point and recompute every hash after it. The same holds for `UNLOCKS.md`, the ledger of the lock ceremony: it proves that a reason was recorded, not who approved it. The threat model is an agent editing history by accident, and a silent rewrite passing unnoticed in review. It is not a motivated adversary. Signing the records, or keeping the head hash somewhere the repository cannot reach, would be a different mechanism; this is not it.
 
 ## Commands
 
