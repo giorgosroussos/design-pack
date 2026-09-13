@@ -286,7 +286,8 @@ scripts/stage-detect.sh <target>
 | Verdict | Meaning |
 | --- | --- |
 | `A-intake` | no `QUESTIONS.md`, no `docs/inputs/` |
-| `A-cards` | a card blocking the specification has no answer |
+| `A-extract` | inputs saved, `QUESTIONS.md` holds no card yet |
+| `A-cards` | a card blocking the specification has no answer — in any stage: every card opens Blocking, and only the owner's deferral moves it to Open |
 | `B-fileset` | no `specs/README.md` |
 | `B-write` | files in the spec map are missing |
 | `C` | specs complete, no `AGENTS.md` |
@@ -332,8 +333,9 @@ Every artifact has a fixed shape, because a line-oriented script has to verify i
 - Answer: C (2026-09-04; recommendation accepted)
 ```
 
-`Blocks:` is `specification` when the pack cannot be written coherently either way, otherwise the
-work package the answer changes. A deferred card carries no answer and is raised again before the
+`Blocks:` is `specification` when a card opens, always; `log-append` refuses anything else. When the
+owner defers a card, the `card-deferred` event sets `Blocks:` to the phase or work package the answer
+changes. A deferred card carries no answer and is raised again before the
 phase it blocks.
 
 ### The events behind that card
@@ -467,6 +469,8 @@ what no script can check.
 - Decisions and cards are recorded by appending an event and rebuilding, never by writing into
   the projection.
 - Retire a record by superseding it. Never by deleting it, never by editing an answer.
+- Every card opens Blocking; only the owner's word defers it. The skill never appends
+  `card-deferred` on its own.
 - One home per rule; the files point at each other and never repeat each other.
 - Spec sections are never renumbered after the first owner review. Content appends.
 - Never add scope. A missing requirement whose absence matters is a card.
@@ -504,9 +508,10 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 | Suite | Cases | Covers |
 | --- | --- | --- |
 | `test-lock-guard.sh` | 20 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
-| `test-decisions-log.sh` | 15 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
-| `test-questions-log.sh` | 31 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
-| `test-check-docs.sh` | 12 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
+| `test-decisions-log.sh` | 17 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
+| `test-questions-log.sh` | 32 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
+| `test-check-docs.sh` | 16 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
+| `test-stage-detect.sh` | 11 | a target walked through every state — empty, inputs saved, cards Blocking, answered, deferred, spec map, files, `AGENTS.md`, baseline — with the verdict asserted at each, including a Blocking card raised during Stage B |
 | `test-allowed-tools.sh` | 1 | every backticked shell command in `stages/*.md` and `SKILL.md`, split into subcommands the way Claude Code matches them, is pre-approved by an `allowed-tools` pattern |
 | `test-render.sh` | 20 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, and one broken red line failing the gate |
 

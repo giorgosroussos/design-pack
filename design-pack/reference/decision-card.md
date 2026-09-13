@@ -27,7 +27,7 @@ Rules for filling it:
 - **Question** is one sentence and is answerable by choosing an option.
 - **Options** are mutually exclusive and cover the plausible space. Each consequence names the surface and states what becomes true in the product, not what becomes true in the code. "→ effect on data: a second entity with its own retention" is right; "→ needs another table" is not.
 - **Recommendation** is mandatory. It is what the skill would have done silently if it were allowed to. Making it explicit is what turns "the agent decided" into "the owner accepted".
-- **Blocks** names what cannot proceed without the answer: `specification` when the spec pack cannot be written coherently either way (typical for data and security cards), otherwise the earliest phase or work package whose acceptance depends on the answer.
+- **Blocks** is `specification` when the card is opened, always: every card blocks the specification until the owner has seen it and either answered it or deferred it, and `log-append` refuses a card that opens otherwise. When the owner defers, the `card-deferred` event sets `Blocks:` to the earliest phase or work package whose acceptance depends on the answer, and the card moves to Open. Where the answer only matters later, the recommendation says so ("can be deferred to Phase N"), so deferring is one word for the owner.
 - **Answer** is appended, never edited: it is an event in the log. If the owner changes their mind later, a new card supersedes the old one, and the old Answer stays where it is.
 
 ## Ordering and batches
@@ -55,7 +55,7 @@ it renders; the way it is written is an appended event, never an edit. Each of t
 
 - Per-card answer: `card-answered` with the answer and the date. It renders as `- Answer: B (2026-09-03)`.
 - "Accept recommendations for the batch": one `card-answered` per card in the batch, with `recommendation_accepted` set, which renders as `- Answer: B (2026-09-03; recommendation accepted)`. The provenance tag in the spec then reads `[Q-NNN, recommendation accepted]`. The acceptance is the owner's recorded decision; the recommendation was the skill's.
-- Deferred: no `card-answered`. A `card-deferred` carrying the phase or package the answer changes moves the card to `## Open` and sets its `Blocks:`. The spec text that depends on it is written from the recommendation and tagged `[Q-NNN]`, so the provisional status is visible wherever the statement is read. It may not enter the locked register until the card is Resolved.
+- Deferred, by the owner's word only: no `card-answered`. A `card-deferred` carrying the phase or package the answer changes moves the card to `## Open` and sets its `Blocks:`. The skill never appends `card-deferred` on its own; a card the owner has not seen stays Blocking. The spec text that depends on it is written from the recommendation and tagged `[Q-NNN]`, so the provisional status is visible wherever the statement is read. It may not enter the locked register until the card is Resolved.
 - Resolved: `card-resolved`, appended when the spec text that carries the card's `[Q-NNN]` tag exists (Stage B), not when the answer is given. `check-docs` asserts that every Resolved card is cited by a statement.
 - Changed mind: a new card, then `card-superseded` on the old one. The old card stays Resolved and keeps its answer and its options; the statement's tag moves to the new card. `check-docs` expects the citation on the successor and stops requiring one on the superseded card, which is why supersession has to be an event rather than a hand edit.
 

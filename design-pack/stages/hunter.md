@@ -35,8 +35,8 @@ exactly this shape:
   - B) <the plausible alternative> → effect on <surface>: <concrete consequence>
 - Recommendation: A, because <the pack currently assumes it; one sentence>
 - Blocks: <the earliest work package in <target>/specs/*-implementation-plan.md whose outcome
-  implements the statement; `specification` only when the statement is in the register or the
-  spec map>
+  implements the statement; `specification` when the statement is in the register or the spec
+  map. This is the deferral target the owner may choose; the card itself is opened Blocking>
 
 Use Q-XXX literally; IDs are assigned later. Do not fix anything. Do not evaluate whether
 the statement is a good decision; the owner does that. Do not skip a statement because it

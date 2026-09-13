@@ -340,8 +340,9 @@ append --stream questions --type card-opened --payload-file - <<'EOF'
  "question":"Are entries ever deleted, and after how long?",
  "options":["A) Never → effect on data: the notebook grows without bound.",
             "B) Purge after N years → effect on data: a retention period and a deletion job."],
- "recommendation":"A, because the input is silent and a purge is a decision the keeper should make.","blocks":"LDG-02"}
+ "recommendation":"A, because the input is silent and a purge is a decision the keeper should make; can be deferred to LDG-02.","blocks":"specification"}
 EOF
+append --stream questions --type card-deferred --set id=Q-002 --set blocks=LDG-02
 python3 scripts/rebuild-decisions.py --quiet
 python3 scripts/rebuild-questions.py --quiet
 

@@ -16,9 +16,10 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
 3. Spawn a second fresh agent with `stages/hunter.md` §Input auditor. It checks every `[input]`
    tag against `docs/inputs/` and writes the unsupported ones to `<scratch>/input-audit.md`.
 4. Merge: drop findings that duplicate an existing card (same question, same surface); for the
-   rest assign the next Q-IDs, set `blocks` (`specification` when the statement is in the register
-   or the spec map, else the earliest package) and append one `card-opened` event each, then
-   rebuild. The section a card lands in follows from `blocks`; the index is generated. An unsupported
+   rest assign the next Q-IDs and append one `card-opened` event each with
+   `blocks: specification` (every card opens Blocking), keeping the package the hunter named in
+   its `Blocks:` line as the recommendation's deferral target ("can be deferred to <package>");
+   then rebuild. Every new card lands under Blocking; the index is generated. An unsupported
    `[input]` becomes a card as well, its statement retagged `[inferred]` until answered.
    Note: while a Blocking card lacks an Answer, `stage-detect` reports `A-cards`; that is
    correct, the owner must answer before anything else, and it returns to `D` afterwards.

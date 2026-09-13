@@ -295,6 +295,10 @@ def _validate_card(event_type, payload):
                "question": clean(need("question")), "blocks": clean(need("blocks"))}
         if out["surface"] not in SURFACES:
             raise LogError("surface %r is not one of %s" % (out["surface"], ", ".join(SURFACES)))
+        if out["blocks"] != BLOCKS_SPECIFICATION:
+            raise LogError("a card opens with blocks %r, always: it is Blocking until the owner answers "
+                           "or defers it, and deferral is a card-deferred event carrying the phase or "
+                           "package (got %r)" % (BLOCKS_SPECIFICATION, out["blocks"]))
         options = need("options")
         if isinstance(options, str):
             options = [line for line in options.splitlines() if line.strip()]
@@ -455,7 +459,7 @@ Card format:
 - Answer: <A|B|C|text> (<date>[; recommendation accepted])
 ```
 
-`Blocking` cards block the item named in `Blocks:` and are answered before it starts. `Open` cards are deferred deliberately; the spec text that depends on them states the recommendation and carries the `[Q-NNN]` tag, so the provisional status is visible where the statement is read. `make check-docs` verifies the card fields, the Surface value, and that every Resolved card that has not been superseded is cited by a statement.
+Every card opens `Blocking` and is answered before the specification proceeds. `Open` cards are the ones the owner deferred, by a `card-deferred` event that names the phase or work package before which they are answered; the spec text that depends on them states the recommendation and carries the `[Q-NNN]` tag, so the provisional status is visible where the statement is read. `make check-docs` verifies the card fields, the Surface value, and that every Resolved card that has not been superseded is cited by a statement.
 """
 
 SECTIONS = (("blocking", "Blocking", "None. Phase 0 can proceed."),

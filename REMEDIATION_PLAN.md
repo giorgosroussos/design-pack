@@ -34,6 +34,7 @@ bash design-pack/scripts/test-questions-log.sh
 bash design-pack/scripts/test-check-docs.sh
 bash design-pack/scripts/test-render.sh
 bash design-pack/scripts/test-allowed-tools.sh
+bash design-pack/scripts/test-stage-detect.sh
 ```
 
 ## Summary board
@@ -747,3 +748,28 @@ Append-only. One entry per session per item touched. Form:
   truncation) would not have been needed: the wrong record would have been refused at the
   door, and had it slipped through, supersession would have retired it from the check.
 - Left open: W7.2–W7.7.
+
+### 2026-09-13 — W7.2 + W7.3 — done (owner decision applied: every card opens Blocking)
+- Changed: `templates/scripts/eventlog.py` — `card-opened` is refused unless `blocks` is
+  `specification`; the QUESTIONS.md preamble says Open means "deferred by the owner".
+  `scripts/stage-detect.sh` — new state `A-extract` (inputs saved, `QUESTIONS.md` without a
+  card) so a session re-entering after Round A0 goes to extraction, not to the file set; header
+  explains why `A-cards` during Stage B is right by design. `stages/A-elicit.md` — entry states,
+  the end condition ("every card presented and answered or deferred", which the detector now
+  reads exactly), A1.4 (always `Blocks: specification`; a later-phase answer is said in the
+  recommendation), A1.5/6, A2.1, A2.3 ("deferral is the owner's act only"). `stages/B-specify.md`
+  — a round that raises a card stops and presents it (W7.3: the skill no longer sends a new card
+  to Open and continues); B5.1 refines the target of an owner's deferral, it does not defer.
+  `stages/D-review.md` D1.4 and `stages/hunter.md` — hunter cards open Blocking with the package
+  as the deferral target. `stages/C-operationalize.md` — adopted-pack conflict cards open
+  Blocking and are presented at the Stage C stop. `reference/decision-card.md` Blocks rule and
+  Deferred bullet; `SKILL.md` step 2 and the deferral sentence; `DOCUMENTATION.md` §6 table,
+  §7, §9 invariant, §11. Tests: new `test-stage-detect.sh` (11 states); `test-questions-log.sh`
+  opens Q-002/Q-004 then defers them and gains a refusal case (open as Open → refused);
+  `test-render.sh` opens Q-002 Blocking and defers it to LDG-02.
+- Proved by: all seven suites green — 20 + 17 + 32 + 16 + 20 + 1 + 11 = 117 cases. Mutation:
+  with the pre-W7.2 `stage-detect.sh` restored, case 2 fails (`B-fileset` where `A-extract` is
+  expected) and the other ten pass. The dry run's F1 (wrong verdict after A0 and before the Open
+  batches) and F6 (Q-016 deferred by the skill, never seen by the owner) can no longer occur:
+  the second is refused by the tool, the first has its own state.
+- Left open: W7.4–W7.7.

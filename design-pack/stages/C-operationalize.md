@@ -26,8 +26,11 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
    itself, so it will report nothing; say so in the report rather than skipping the agent.
 4. Stage A did not run, so append the `card-opened` events Stage A would have appended, one for
    every behavioural conflict that `docs/inputs/README.md` records between a non-authoritative
-   input and the pack (`reference/decision-card.md` shape; `blocks` names the work package the
-   conflict affects, never `specification`, so they render Open), then rebuild the projection. If a compiled red line or design-direction sentence would otherwise name a
+   input and the pack (`reference/decision-card.md` shape; `blocks: specification`, like every
+   card, with the work package the conflict affects named in the recommendation as the deferral
+   target), then rebuild the projection. These cards are presented to the owner as one batch at
+   the Stage C stop (Stage A form); the owner answers or defers each, and the answers are recorded
+   before Stage D. If a compiled red line or design-direction sentence would otherwise name a
    conflict with no card, this is where the card comes from.
 
 ## Step C1 — Verbatim assets
@@ -134,5 +137,6 @@ nothing into `CLAUDE.md`.
 
 Report: files generated with sizes, `AGENTS.md` size against the ceiling, red-line count,
 `check-docs` result, and the lock layer: hooks active or not, how many files were set read-only,
-and the tier of each locked path. State that Stage D runs the assumption hunter and then asks the owner to
+and the tier of each locked path. For an adopted pack, present the conflict cards of §Adopted
+packs step 4 as a batch. State that Stage D runs the assumption hunter and then asks the owner to
 read the pack. Stop.

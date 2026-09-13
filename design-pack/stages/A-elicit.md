@@ -1,11 +1,14 @@
 # Stage A — Elicit
 
-Entry: `stage-detect` said `A-intake` or `A-cards`. Read `reference/surfaces.md`,
+Entry: `stage-detect` said `A-intake`, `A-extract` or `A-cards`. Read `reference/surfaces.md`,
 `reference/decision-card.md` and `reference/elicitation-checklist.md` before the first
 round of this stage in a session.
 
-Stage A ends when no card whose `Blocks:` is `specification` lacks an `Answer:`. It runs
-in rounds; every round ends by stopping and waiting for the owner.
+Every card opens Blocking (`Blocks: specification`; `log-append` refuses anything else) and
+becomes Open only when the owner defers it. Stage A therefore ends when no Blocking card lacks
+an `Answer:`, which is the same as saying every card was presented and either answered or
+deferred; `stage-detect` reads exactly that. It runs in rounds; every round ends by stopping
+and waiting for the owner.
 
 ## Round A0 — Intake (only when `A-intake`)
 
@@ -27,7 +30,7 @@ in rounds; every round ends by stopping and waiting for the owner.
    inputs are silent on (stack, deployment, jurisdiction, budget, existing systems).
 5. Stop. Ask the owner to confirm or correct the authority levels. Do not extract yet.
 
-## Round A1 — Extract (first `A-cards` round)
+## Round A1 — Extract (when `A-extract`)
 
 1. Read every input in full.
 2. Build the candidate list in the scratchpad (not in the repository): every statement,
@@ -39,9 +42,9 @@ in rounds; every round ends by stopping and waiting for the owner.
    - a fact the input states: no card, remember it as `[input]` for Stage B;
    - touches a surface: append a `card-opened` event (payload fields in
      `reference/decision-card.md`; the shape of the card is unchanged, only the way it is
-     written), with `Blocks: specification` for data and security cards, and for scope cards that
-     move something across the MVP boundary; otherwise `Blocks:` the earliest phase or package the
-     answer changes (name it `Phase N` for now; Stage B replaces it with a package ID);
+     written) with `Blocks: specification`, always: a card is Blocking until the owner answers
+     it or defers it. Where the answer only matters from a later phase on, say so in the
+     recommendation ("can be deferred to Phase N"), so the owner can defer it in one word;
    - touches none: add it to the defaults ledger in the scratchpad (decision, alternatives,
      why). Stage B turns each into a `D-NNN` when it becomes a spec statement.
 5. Assign IDs in the order data, security, scope, external, ux, so IDs read in dependency order,
@@ -49,26 +52,30 @@ in rounds; every round ends by stopping and waiting for the owner.
    opened. One event per card:
    `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/log-append.py --root <target> --stream questions --type card-opened --payload-file -`
    with the payload on stdin (`id`, `title`, `surface`, `source`, `question`, `options` as a JSON
-   array, `recommendation`, `blocks`). The tool refuses a card whose options carry no consequence
-   or whose surface is not one of the five.
+   array, `recommendation`, `blocks: specification`). The tool refuses a card whose options carry
+   no consequence, whose surface is not one of the five, or that tries to open as anything but
+   Blocking.
 6. `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/rebuild-questions.py --root <target>`. The index and the
-   Blocking, Open and Resolved sections are generated: a card sits under `## Blocking` when its
-   `blocks` is `specification`, otherwise under `## Open`, and nothing places it by hand.
+   Blocking, Open and Resolved sections are generated: every new card sits under `## Blocking`;
+   a `card-deferred` event moves it to `## Open`; nothing places it by hand.
 7. Report the counts per surface and the number of batches. Then present batch 1 (below)
    in the same turn.
 
 ## Rounds A2… — Present a batch, record answers
 
 1. A batch is one surface group in the order data, security, scope, external, ux, at most
-   eight cards, blocking cards first. Present it exactly in the form given in
+   eight cards. Present it exactly in the form given in
    `reference/decision-card.md` §Ordering and batches, cards in full.
 2. Stop. Wait for the owner.
 3. Record answers as events, one `card-answered` per card, then rebuild
    (`reference/decision-card.md` §Recording answers). Every `card-answered` needs `answer` (the
    letter of the chosen option) and `date`; "Accept recommendations" is one event per card of the
    batch with the recommended letter as the answer and `--set recommendation_accepted=true` as
-   well. A card the owner explicitly defers gets no answer: append `card-deferred` with a `blocks` naming the phase, which moves it
-   to `## Open`; say so in the report.
+   well. A card the owner explicitly
+   defers gets no answer: append `card-deferred` with a `blocks` naming the phase or package the
+   answer changes (`Phase N` for now; Stage B refines it to a package ID), which moves it to
+   `## Open`; say so in the report. Deferral is the owner's act only: the skill never appends
+   `card-deferred` on its own initiative.
 4. If an answer invalidates or creates another card, write it now, in the same surface group,
    with the next free ID. It joins the next batch.
 5. Present the next batch. When every surface group is done, go to Exit.

@@ -53,7 +53,7 @@ owner's language.
 
 1. `bash ${CLAUDE_SKILL_DIR}/scripts/stage-detect.sh <target>` prints the stage. There is no
    state file; the documents are the state.
-2. Read the matching stage file and follow it: `A-intake`, `A-cards` → `stages/A-elicit.md`;
+2. Read the matching stage file and follow it: `A-intake`, `A-extract`, `A-cards` → `stages/A-elicit.md`;
    `B-fileset`, `B-write` → `stages/B-specify.md`; `C` → `stages/C-operationalize.md`;
    `D` → `stages/D-review.md`; `frozen` → say so, point at the amendment regime in the target's
    `AGENTS.md`, offer only a re-run of the hunter (Stage D round D1) on request, and stop.
@@ -85,7 +85,9 @@ nobody questions again. Four mechanisms, all mandatory, working together:
    card. It fixes nothing and judges nothing.
 
 Deferral is allowed: a card may stay Open with `Blocks:` set, and the loop's third prompt
-raises it before that phase. Silent decision is the only unacceptable state.
+raises it before that phase. But every card opens Blocking and only the owner's word defers
+it (`card-deferred`); the skill never defers a card on its own. Silent decision is the only
+unacceptable state.
 
 ## Hard rules
 
@@ -164,6 +166,7 @@ raises it before that phase. Silent decision is the only unacceptable state.
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |
 | `scripts/test-render.sh` | renders every template for a fixture product and proves the result passes the whole gate, the lock layer and `stage-detect` |
 | `scripts/test-allowed-tools.sh` | every shell command the stage files instruct matches a `Bash(...)` pattern of this file's `allowed-tools`, subcommand by subcommand |
+| `scripts/test-stage-detect.sh` | walks a target through every state and asserts `stage-detect` names each one |
 | `scripts/extract-normative.py` | lists normative statements with provenance; used after every writing round and as hunter input |
 | `scripts/render-seed.py` | renders `templates/decisions-seed.json` and appends the regime records through `log-append.py`, in one command |
 | `scripts/stage-detect.sh` | derives the stage from the target repository |

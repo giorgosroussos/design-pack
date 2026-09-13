@@ -76,9 +76,10 @@ Mechanical pass after every round:
    lists every `[inferred]`. For each: does it touch a surface (`reference/surfaces.md`)?
    Yes: write a card, tag the statement `[Q-NNN]`, treat the statement as the recommendation.
    No: write a `D-NNN`, retag `[D-NNN]`.
-3. If a new card has `Blocks: specification`: stop the round, present it (Stage A batch form),
-   wait, record the answer, then continue. Cards with a later `Blocks:` go to `## Open` and the
-   round continues.
+3. Every new card opens Blocking, so a round that raises one stops: present the new cards
+   (Stage A batch form), wait, record the owner's answers or deferrals as events, rebuild, then
+   continue. A card the owner has not seen is never deferred by the skill; where the answer
+   only matters later, the recommendation says so and the owner defers in one word.
 4. `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --quiet`;
    only citation, marker and decision failures are actionable before the root documents exist.
    From B2 onward `chain-intact` and `projection-fresh` run too and both must pass: a failure
@@ -103,8 +104,10 @@ Mechanical pass after every round:
    command contract; FND-03 and FND-04 only when there is an API or a UI). Domain phases in
    dependency order, each with Goal, packages with stable IDs and outcome bullets, and Exit
    criteria a command or test demonstrates. For every Open card whose `Blocks:` still names a
-   `Phase N`, append a `card-deferred` event carrying the package ID that the answer changes, and
-   rebuild: the card's `Blocks:` is data in the log, not a line to edit.
+   `Phase N` — a card the owner deferred in Stage A, before packages existed — append a
+   `card-deferred` event carrying the package ID that the answer changes, and rebuild: this
+   refines the target of the owner's deferral, it does not defer anything, and the card's
+   `Blocks:` is data in the log, not a line to edit.
 2. Agent playbook from its template, near-verbatim; regenerate the example prompt from a real
    Phase 1 or Phase 2 package.
 3. Product-intent traceability from its template: one row per requirement in the inputs, in the

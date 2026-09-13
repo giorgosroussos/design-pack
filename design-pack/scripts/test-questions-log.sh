@@ -81,8 +81,9 @@ card card-opened <<'EOF'
  "options":["A) One fixed page → effect on scope: one screen and one query.",
             "B) Filters and export → effect on scope: a reporting feature with its own weight."],
  "recommendation":"A, because the requirement says simple view.",
- "blocks":"phase 3"}
+ "blocks":"specification"}
 EOF
+event --type card-deferred --set id=Q-002 --set blocks="phase 3"
 rebuild
 
 if python3 - <<'EOF'
@@ -235,8 +236,9 @@ card card-opened <<'EOF'
  "options":["A) No → effect on scope: one screen, as before.",
             "B) Yes → effect on scope: per-mechanic figures and what they get used for."],
  "recommendation":"A, because nobody has said what the number would be used for.",
- "blocks":"phase 3"}
+ "blocks":"specification"}
 EOF
+event --type card-deferred --set id=Q-004 --set blocks="phase 3"
 rebuild
 if python3 probe.py > "$work/p5d.out" 2>&1; then
     report ok "5d opening the successor closes the seam again" ""
@@ -327,6 +329,11 @@ refuses "a card opened twice" --type card-opened \
     --set id=Q-001 --set title=x --set surface=data --set source=y --set question=z \
     --set 'options=A) one → effect on data: x.
 B) two → effect on data: y.' --set blocks=specification
+refuses "a card that tries to open as Open (blocks: phase 2)" --type card-opened \
+    --set id=Q-005 --set title=x --set surface=data --set source=y --set question=z \
+    --set 'options=A) one → effect on data: x.
+B) two → effect on data: y.' --set blocks="phase 2"
+grep -q 'opens with blocks' "$work/refuse.out" || report no "8 open-as-Open refusal reason" "$(cat "$work/refuse.out")"
 refuses "a card whose ID skips ahead (Q-010 when Q-005 is next)" --type card-opened \
     --set id=Q-010 --set title=x --set surface=data --set source=y --set question=z \
     --set 'options=A) one → effect on data: x.
