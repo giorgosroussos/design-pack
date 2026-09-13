@@ -6,7 +6,11 @@ It reads the last record to learn `seq` and `hash`, refuses to continue if that
 record does not verify (never append onto a broken chain), builds the new record,
 computes `prev` and `hash` over the canonical form, and appends exactly one line.
 It also refuses an event that the stream's projection could not fold, because the
-log is append-only and such an event could never be taken back.
+log is append-only and such an event could never be taken back. For the same
+reason a `decision-added` whose text cites a section that does not exist in a
+spec file that does is refused: `check-docs` would fail on it and nothing could
+remove it. A citation into a spec not written yet is allowed; the gate checks it
+later, and supersession then retires the record's text from the check.
 It always appends: there is no deduplication, and recording the same event twice
 records it twice.
 
@@ -29,6 +33,7 @@ Exit status: 0 appended, 2 usage or invalid event, 3 the chain does not verify.
 
 import argparse
 import datetime
+import importlib.util
 import json
 import os
 import sys
@@ -39,6 +44,22 @@ import eventlog  # noqa: E402
 
 def now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def dead_citations(root, payload):
+    """Citations in a decision's text that point into an existing spec and miss.
+
+    Uses the gate's own parser (`check-docs.py`, beside this script); when that
+    file is absent there is nothing to check against and nothing is refused.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-docs.py")
+    if not os.path.isfile(path):
+        return []
+    spec = importlib.util.spec_from_file_location("checkdocs", path)
+    checkdocs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checkdocs)
+    text = "\n".join(str(payload.get(k, "")) for k in ("decision", "why", "alternatives", "affected_specs"))
+    return checkdocs.citation_failures(root, text, existing_only=True)
 
 
 def main():
@@ -83,6 +104,14 @@ def main():
     except eventlog.LogError as exc:
         sys.stderr.write("log-append: %s\n" % exc)
         return 2
+
+    if args.stream == eventlog.DECISIONS_STREAM and args.event_type == "decision-added":
+        dead = dead_citations(root, payload)
+        if dead:
+            sys.stderr.write("log-append: this decision cites a section that does not exist, and on an "
+                             "append-only log the text could never be fixed; refused.\n  %s\n"
+                             % "\n  ".join(dead))
+            return 2
 
     path = eventlog.log_path(root)
     directory = os.path.dirname(path)

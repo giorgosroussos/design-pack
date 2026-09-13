@@ -46,7 +46,7 @@ bash design-pack/scripts/test-allowed-tools.sh
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | done |
-| W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | not started |
+| W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | in progress |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -436,8 +436,11 @@ Acceptance:
 
 ## W7 — Findings of the dry run (2026-09-08)
 
-Status: not started
-Decision: three of the items below are the owner's (marked **owner**); the rest are fixes.
+Status: in progress
+Decision: the three owner items below were decided on 2026-09-13 — **the owner accepted every
+recommendation as written** (W7.2 part 2: every Stage A card opens Blocking and deferral makes it
+Open; W7.5: Stage C makes the pack's first commit; W7.6: a card only for the hosting provider and
+anything paid, language and framework are `D-NNN`). The rest are fixes.
 
 Source: `reports/dry-run-2026-09-08.md`, sections Friction (F1–F14) and Defects (D1–D5). The run
 reached the Stage C stop with `make check-docs` at 0 failures, but needed one unsanctioned
@@ -461,9 +464,9 @@ current spec headings before appending, so a bad citation is refused at the door
 Tests in `test-check-docs.sh` and `test-decisions-log.sh`. Estimate: ½ day.
 
 Acceptance:
-- [ ] a superseded entry with a dead citation passes `citations`; a live entry with one fails.
-- [ ] `` `specs/README.md` §Provenance says that… `` resolves; `§Nonexistent` fails.
-- [ ] `log-append` refuses a `decision-added` whose text cites a section that does not exist.
+- [x] a superseded entry with a dead citation passes `citations`; a live entry with one fails.
+- [x] `` `specs/README.md` §Provenance says that… `` resolves; `§Nonexistent` fails.
+- [x] `log-append` refuses a `decision-added` whose text cites a section that does not exist.
 
 ### W7.2 — `stage-detect` misreports during Stage A (F1, D3)
 
@@ -724,3 +727,23 @@ Append-only. One entry per session per item touched. Form:
   the missing placeholders; all six suites green.
 - Left open: W7 holds every other finding, three of them with an owner decision. A live
   `/design-pack` session in the owner's permission mode is still the final confirmation of (b).
+
+### 2026-09-13 — W7.1 — done
+- Changed: `templates/scripts/check-docs.py` — `check_citations` refactored over
+  `line_citation_failures()` and a reusable `citation_failures(root, text, existing_only)`;
+  the body of a superseded entry in `DECISIONS.md` (from its `Status: superseded by` line to the
+  next `## D-`) is skipped, because it is history on an append-only log; `resolve_named()`
+  reads a `§Name` citation as the longest heading the README has that the text starts with, so
+  prose may follow it. `templates/scripts/log-append.py` — a `decision-added` whose text cites
+  a section missing from an *existing* spec is refused with the parser's message (imports
+  `check-docs.py` from beside itself; absent, nothing is refused); a citation into a spec not
+  yet written is allowed, because Stage B seeds the regime records before the register exists.
+  `DOCUMENTATION.md` §8 and `templates/log-README.md` say so.
+- Proved by: `test-check-docs.sh` +4 (dead citation in a superseded entry passes and the same
+  one in a live entry fails on its line; `§Provenance says that …` resolves; `§Nonexistent thing`
+  fails quoting the words; `existing_only` flags only the missing section of an existing spec);
+  `test-decisions-log.sh` +2 (refusal leaves the log at 3 records; a future citation appends).
+  All six suites green — 16 + 17 + 31 + 20 + 20 + 1 = 105 cases. The dry run's deviation (log
+  truncation) would not have been needed: the wrong record would have been refused at the
+  door, and had it slipped through, supersession would have retired it from the check.
+- Left open: W7.2–W7.7.

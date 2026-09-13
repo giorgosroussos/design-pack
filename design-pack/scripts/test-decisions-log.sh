@@ -235,5 +235,28 @@ else
 fi
 python3 scripts/rebuild-decisions.py --quiet
 
+# --- 7. a decision citing a missing section of an existing spec is refused ------
+
+mkdir -p specs
+printf '# Scope\n\n## 1. Purpose\n\nText.\n' > specs/01-scope.md
+if append --type decision-added --set id=D-003 --set date=2026-09-04 --set title="Dead citation" \
+        --set type=implementation --set decision="Cites \`01\` §7, which does not exist." --set why="y." \
+        --set alternatives="z." --set affected_specs="\`01\` §7." > "$work/cite.out" 2>&1; then
+    report no "7 a decision citing a missing section" "it was appended; the failure is now permanent"
+elif grep -q 'does not resolve' "$work/cite.out" && [ "$(seqs)" = "1,2,3" ]; then
+    report ok "7 a decision citing a section missing from an existing spec is refused, nothing appended" ""
+else
+    report no "7 dead citation refusal" "$(cat "$work/cite.out")"
+fi
+if append --type decision-added --set id=D-003 --set date=2026-09-04 --set title="Future citation" \
+        --set type=implementation --set decision="Cites \`05\` §2, a spec not written yet." --set why="y." \
+        --set alternatives="z." --set affected_specs="none." > "$work/cite2.out" 2>&1 && [ "$(seqs)" = "1,2,3,4" ]; then
+    report ok "7b a citation into a spec not written yet is accepted; the gate checks it later" ""
+else
+    report no "7b future citation" "$(cat "$work/cite2.out")"
+fi
+python3 scripts/rebuild-decisions.py --quiet
+rm -rf specs
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

@@ -47,4 +47,4 @@ make rebuild-questions   # render QUESTIONS.md from the log
 make check-docs          # includes chain-intact and projection-fresh
 ```
 
-Appending is `scripts/log-append.py`, the only sanctioned writer. It refuses to append onto a chain that does not verify, so a break is never buried under later records.
+Appending is `scripts/log-append.py`, the only sanctioned writer. It refuses to append onto a chain that does not verify, so a break is never buried under later records; it refuses an event no projection could fold, and a decision whose text cites a section that an existing spec does not have, because on an append-only log neither could ever be taken back. A record that turns out wrong is retired by `decision-superseded`: its text stays readable as history, and `check-docs` stops checking the citations inside it.

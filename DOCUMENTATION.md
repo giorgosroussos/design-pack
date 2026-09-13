@@ -422,7 +422,7 @@ standard library, and it runs before any code exists.
 
 | Rule | Asserts |
 | --- | --- |
-| `citations` | every `NN` §M citation resolves to a real heading |
+| `citations` | every `NN` §M and `README.md` §Name citation resolves to a real heading (a §Name is the longest heading the text starts with, so prose may follow); the body of a superseded decision is history and is not checked |
 | `now-items` | no `Now` item is already `done`; every `Now` item has a traceability row |
 | `plan-size` | `PLAN.md` stays under its line ceiling |
 | `gaps` | every package or phase a gap cites exists; gap IDs unique and increasing |

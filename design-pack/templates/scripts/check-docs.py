@@ -11,7 +11,11 @@ Run from the repository root:  python3 scripts/check-docs.py [--root DIR] [--qui
 
 Rules
   citations     every `NN` §M / `specs/NN-name.md` §M / `README.md` §Name cited
-                anywhere in the root documents or the specs resolves to a heading
+                anywhere in the root documents or the specs resolves to a heading.
+                A §Name citation is read as the longest heading the README has, so
+                prose may follow it. The body of a superseded entry in DECISIONS.md
+                is history and is not checked: the log is append-only, so a dead
+                citation there could otherwise never be cleared
   now-items     no `Now` item in PLAN.md is `done` in TRACEABILITY.md, and every
                 `Now` item has a TRACEABILITY.md row
   plan-size     PLAN.md stays under its line ceiling
@@ -189,44 +193,102 @@ def expand_sections(text):
     return out
 
 
+def resolve_named(rest, token, named):
+    """Resolve a `§Name` citation that follows a README token.
+
+    Returns None when no `§` follows, else (key, name, resolved). The name is
+    the LONGEST heading of the README that the text after `§` starts with, so a
+    sentence may go on after the citation ("`specs/README.md` §Provenance says
+    that ..."). Reading up to the next punctuation instead made every such
+    sentence fail.
+    """
+    m = re.match(r"\s*§\s*", rest)
+    if not m:
+        return None
+    candidate = rest[m.end():]
+    keys = ["specs/README.md", "README.md"] if "specs/" in token else ["README.md", "specs/README.md"]
+    for key in keys:
+        for name in sorted(named.get(key, ()), key=len, reverse=True):
+            if candidate.lower().startswith(name) and (len(candidate) == len(name) or not candidate[len(name)].isalnum()):
+                return key, name, True
+    return keys[0], " ".join(candidate.split()[:4]), False
+
+
+def line_citation_failures(root, line, numbered, named, existing_only=False):
+    """(messages, citations checked) for one line of text.
+
+    With `existing_only`, a citation into a spec file that does not exist yet is
+    not a failure: `log-append` uses this before the specs are written, and the
+    full check runs on every gate afterwards.
+    """
+    out, count = [], 0
+    for fm in re.finditer(r"`specs/(\d{2}-[a-z0-9-]+\.md)`", line):
+        if not exists(os.path.join(root, SPECS_DIR, fm.group(1))) and not existing_only:
+            out.append("`specs/%s` is not a file" % fm.group(1))
+    for m in FILE_TOKEN_RE.finditer(line):
+        nn, readme = m.group(1), m.group(2)
+        rest = line[m.end():]
+        if readme:
+            hit = resolve_named(rest, m.group(0), named)
+            if hit is None:
+                continue
+            key, name, resolved = hit
+            if key not in named and existing_only:
+                continue
+            count += 1
+            if not resolved:
+                out.append("`%s` §%s does not resolve" % (key, name))
+            continue
+        secs = expand_sections(rest)
+        if not secs:
+            continue
+        if nn not in numbered:
+            if not existing_only:
+                out.append("no spec file numbered %s" % nn)
+            continue
+        for s in secs:
+            count += 1
+            if s not in numbered[nn]:
+                out.append("`%s` §%s does not resolve" % (nn, s))
+    return out, count
+
+
+def citation_failures(root, text, existing_only=False):
+    """Every citation failure in a piece of text, against the specs under root."""
+    numbered, named = section_index(root)
+    out = []
+    for line in text.splitlines():
+        msgs, _ = line_citation_failures(root, line, numbered, named, existing_only)
+        out.extend(msgs)
+    return out
+
+
 def check_citations(root, docs, numbered, named):
     count = 0
     for doc in docs:
         text = read(doc)
         rel = os.path.relpath(doc, root)
-        in_fence = False
+        in_fence, superseded = False, False
         for ln, line in enumerate(text.splitlines(), 1):
             if line.strip().startswith("```"):
                 in_fence = not in_fence
                 continue
             if in_fence:
                 continue
-            for fm in re.finditer(r"`specs/(\d{2}-[a-z0-9-]+\.md)`", line):
-                if not exists(os.path.join(root, SPECS_DIR, fm.group(1))):
-                    fail("citations", "%s:%d" % (rel, ln), "`specs/%s` is not a file" % fm.group(1))
-            for m in FILE_TOKEN_RE.finditer(line):
-                nn, readme = m.group(1), m.group(2)
-                rest = line[m.end():]
-                if readme:
-                    nm = re.match(r"\s*§\s*([A-Z][A-Za-z -]*?)(?=\s+rule\b|\s+and\b|[,;:.)`]|$)", rest)
-                    if not nm:
-                        continue
-                    name = nm.group(1).strip().lower()
-                    count += 1
-                    key = "specs/README.md" if ("specs/" in m.group(0) or name in named.get("specs/README.md", set())) else "README.md"
-                    if name not in named.get(key, set()):
-                        fail("citations", "%s:%d" % (rel, ln), "`%s` §%s does not resolve" % (key, nm.group(1).strip()))
+            if rel == "DECISIONS.md":
+                # A superseded record keeps its text as history; its citations are
+                # not live and, on an append-only log, could never be repaired.
+                if re.match(r"^##\s+D-\d{3}\b", line):
+                    superseded = False
+                elif re.match(r"^Status:\s*superseded by D-\d{3}", line):
+                    superseded = True
                     continue
-                secs = expand_sections(rest)
-                if not secs:
+                if superseded:
                     continue
-                if nn not in numbered:
-                    fail("citations", "%s:%d" % (rel, ln), "no spec file numbered %s" % nn)
-                    continue
-                for s in secs:
-                    count += 1
-                    if s not in numbered[nn]:
-                        fail("citations", "%s:%d" % (rel, ln), "`%s` §%s does not resolve" % (nn, s))
+            msgs, n = line_citation_failures(root, line, numbered, named)
+            count += n
+            for msg in msgs:
+                fail("citations", "%s:%d" % (rel, ln), msg)
     ok("citations", "%d section citations checked" % count)
 
 

@@ -199,5 +199,62 @@ else
     report no "extract-normative" "did not list the untagged statement"
 fi
 
+# --- citations: superseded decisions are history; §Name reads the longest heading ---
+
+rm -rf specs docs; mkdir -p specs
+printf '# Specs\n\n## Provenance\n\nTags.\n\n## Conflict resolution\n\nOrder.\n' > specs/README.md
+printf '# Scope\n\n## 1. Purpose\n\nText.\n' > specs/01-scope.md
+cat > DECISIONS.md <<'EOF'
+# DECISIONS
+
+## Index
+
+- D-001 — Old — implementation — superseded by D-002
+- D-002 — New — implementation
+
+## D-001 (2026-09-08) — Old
+Status: superseded by D-002
+Type: implementation
+Decision: cites `01` §9, which never existed.
+Why: history.
+Alternatives: none.
+Affected specs: `01` §9.
+
+## D-002 (2026-09-08) — New
+Type: implementation
+Decision: cites `01` §1 and `specs/README.md` §Provenance says that tags are trailing.
+Why: live.
+Alternatives: none.
+Affected specs: `01` §1.
+EOF
+if probe 'n, m = cd.section_index(root); cd.check_citations(root, [os.path.join(root, "DECISIONS.md")], n, m)' > "$work/ct1.out" 2>&1; then
+    report ok "citations: a dead citation inside a superseded decision is history and passes; §Name followed by prose resolves" ""
+else
+    report no "citations: superseded / prose" "$(cat "$work/ct1.out")"
+fi
+sed -i 's/^Decision: cites `01` §1 and/Decision: cites `01` §9 and/' DECISIONS.md
+if probe 'n, m = cd.section_index(root); cd.check_citations(root, [os.path.join(root, "DECISIONS.md")], n, m)' > "$work/ct2.out" 2>&1; then
+    report no "citations: dead citation in a live decision" "passed"
+elif grep -q 'DECISIONS.md:18: `01` §9 does not resolve' "$work/ct2.out"; then
+    report ok "citations: the same dead citation in a live decision fails, on its line" ""
+else
+    report no "citations: live dead" "$(cat "$work/ct2.out")"
+fi
+printf 'See `specs/README.md` §Nonexistent thing for details.\n' > AGENTS.md
+if probe 'n, m = cd.section_index(root); cd.check_citations(root, [os.path.join(root, "AGENTS.md")], n, m)' > "$work/ct3.out" 2>&1; then
+    report no "citations: unknown §Name" "passed"
+elif grep -q '§Nonexistent thing for details' "$work/ct3.out"; then
+    report ok "citations: an unknown §Name fails, quoting the words that did not match" ""
+else
+    report no "citations: unknown name" "$(cat "$work/ct3.out")"
+fi
+# the same parser, exposed for log-append: a not-yet-written spec is not a failure with existing_only
+if probe 'f = cd.citation_failures(root, "cites `01` §9 and `07` §3 and `specs/07-plan.md`", existing_only=True); assert f == ["`01` §9 does not resolve"], f' > "$work/ct4.out" 2>&1; then
+    report ok "citations: citation_failures(existing_only) flags only the section missing from an existing spec" ""
+else
+    report no "citations: existing_only" "$(cat "$work/ct4.out")"
+fi
+rm -f AGENTS.md DECISIONS.md
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
