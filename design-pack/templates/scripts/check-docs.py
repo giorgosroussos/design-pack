@@ -7,7 +7,12 @@ pack contradict each other in a way that can be detected without judgement.
 Every rule here was once a sentence in AGENTS.md; a rule that can be checked
 is checked and removed from the prose.
 
-Run from the repository root:  python3 scripts/check-docs.py [--root DIR] [--quiet]
+Run from the repository root:  python3 scripts/check-docs.py [--root DIR] [--quiet] [--only RULE,RULE]
+
+`--only` keeps the FAIL lines of the named rules and drops the rest, for the
+passes a stage runs before every document exists (Stage A's exit, Stage B's
+rounds); the summary says how many failures were dropped, so a scoped run
+never looks like a clean one.
 
 Rules
   citations     every `NN` §M / `specs/NN-name.md` §M / `README.md` §Name cited
@@ -35,10 +40,10 @@ Rules
                 unless it was superseded, in which case its successor carries the
                 citation and has to exist
   normative-tagged
-                every normative statement in `specs/` (MUST, MUST NOT, SHALL,
-                SHOULD, MAY outside code spans; the items under a lead-in that
-                ends with the keyword and a colon; every bullet of the locked
-                register) ends with a provenance tag. An adopted pack, one whose
+                every normative statement in `specs/`, the spec map included
+                (MUST, MUST NOT, SHALL, SHOULD, MAY outside code spans; the items
+                under a lead-in that ends with the keyword and a colon; every
+                bullet of the locked register) ends with a provenance tag. An adopted pack, one whose
                 `docs/inputs/README.md` lists `specs/` itself as an authoritative
                 input, is exempt: its statements are `[input]` by declaration
   inferred-zero once `specs/README.md` is stamped `Status: Implementation baseline`,
@@ -602,7 +607,8 @@ def frozen(root):
 
 def check_normative(root, adopted):
     total, untagged = 0, 0
-    for p in spec_files(root):
+    readme = os.path.join(root, SPECS_DIR, "README.md")
+    for p in spec_files(root) + ([readme] if exists(readme) else []):
         rel = os.path.relpath(p, root)
         is_register = os.path.basename(p).endswith("-decision-register.md")
         for ln, section, tag, statement in normative_statements(read(p), is_register):
@@ -821,8 +827,11 @@ def main():
     ap = argparse.ArgumentParser(description="Mechanical consistency checks for the documentation layer.")
     ap.add_argument("--root", default=".", help="repository root (default: current directory)")
     ap.add_argument("--quiet", action="store_true", help="print only failures and the summary")
+    ap.add_argument("--only", default=None, metavar="RULE,RULE",
+                    help="report failures of these rules only (e.g. citations,markers,decisions,cards)")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
+    only = set(r.strip() for r in args.only.split(",")) if args.only else None
 
     docs = [os.path.join(root, d) for d in ROOT_DOCS if exists(os.path.join(root, d))]
     specs = spec_files(root)
@@ -848,13 +857,22 @@ def main():
     makefile = os.path.join(root, "Makefile")
     check_markers(root, all_docs + ([makefile] if exists(makefile) else []))
 
+    dropped = 0
+    if only is not None:
+        kept = [f for f in failures if f.split()[1] in only]
+        dropped = len(failures) - len(kept)
+        failures[:] = kept
     if not args.quiet:
         for n in notes:
             print(n)
     for f in failures:
         print(f)
     print()
-    print("summary: %d failure(s)" % len(failures))
+    if only is not None:
+        print("summary: %d failure(s) in %s; %d failure(s) of other rules dropped by --only"
+              % (len(failures), ",".join(sorted(only)), dropped))
+    else:
+        print("summary: %d failure(s)" % len(failures))
     print("cards per surface (open/resolved): " + ", ".join(
         "%s %d/%d" % (s, per_surface[s][0], per_surface[s][1]) for s in ["data", "security", "scope", "external", "ux"]))
     print("[inferred] statements in specs: %s" % (", ".join("%s %d" % kv for kv in sorted(inferred.items())) or "none"))

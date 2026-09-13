@@ -499,6 +499,8 @@ def main():
         print("lock-guard: %d violation(s). Nothing was committed." % len(violations))
         return 1
     if not args.quiet:
+        if args.staged and git_show(root, "HEAD:%s" % DEFAULT_MANIFEST) is None and manifest_label.startswith("staged"):
+            print("lock-guard: no HEAD yet; every staged path is new and nothing is locked before the first commit")
         print("lock-guard: clean (%d rule(s) in %s)" % (len(rules), manifest_label))
     return 0
 

@@ -12,7 +12,7 @@ Placeholders:
   {{INFRA_SERVICES}}        local infrastructure the contract starts ("PostgreSQL and Redis"), or "none" for a static product
   {{CONTRACT_DRIFT_TARGET}} name of the drift-check target when a generated contract exists (e.g. `openapi`); else remove the bullet
   {{PRIMARY_DB}}            the database CI must test against ("PostgreSQL 16"); else "the production database engine"
-  {{NN_TESTING}} {{NN_ARCH}} {{NN_API}} {{NN_UX}} {{NN_L10N}}  spec numbers by role
+  {{NN_TESTING}} {{NN_ARCH}} {{NN_API}}  spec numbers by role (the testing file is always NN-testing-acceptance.md)
   {{DOMAIN_PHASES}}         the generated phase sections, starting at "## 4. Phase 1 — ..."
   {{N_PARALLEL}} {{N_BACKLOG}} section numbers for the last two sections (after the last phase)
   {{LANES}}                 lane list adapted to the architecture (one per independently buildable component plus tests and infra)
@@ -65,7 +65,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 `FND-04` Design, accessibility and localization foundation
 
 - Shared tokens and base components, focus and error patterns, responsive shell.
-- Localization skeleton with the fallback rule of `{{NN_L10N}}`; no hard-coded UI strings.
+- Localization skeleton with the fallback rule the UX spec states; no hard-coded UI strings.
 - Automated accessibility smoke test wired as a real gate, replacing its tripwire.
 <!-- /if -->
 

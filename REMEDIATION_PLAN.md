@@ -47,7 +47,7 @@ bash design-pack/scripts/test-stage-detect.sh
 | W4 | `normative-tagged` and `inferred-zero` rules | C — enforcement of the core claim | ½ day | done |
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | done |
-| W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | in progress |
+| W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | done |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -437,7 +437,7 @@ Acceptance:
 
 ## W7 — Findings of the dry run (2026-09-08)
 
-Status: in progress
+Status: done
 Decision: the three owner items below were decided on 2026-09-13 — **the owner accepted every
 recommendation as written** (W7.2 part 2: every Stage A card opens Blocking and deferral makes it
 Open; W7.5: Stage C makes the pack's first commit; W7.6: a card only for the hosting provider and
@@ -773,3 +773,30 @@ Append-only. One entry per session per item touched. Form:
   batches) and F6 (Q-016 deferred by the skill, never seen by the owner) can no longer occur:
   the second is refused by the tool, the first has its own state.
 - Left open: W7.4–W7.7.
+
+### 2026-09-13 — W7.4 + W7.5 + W7.6 + W7.7 — done; W7 closed
+- Changed: **W7.4** `stages/B-specify.md` B1.1 fixes the two names the templates cite (the
+  testing file is `NN-testing-acceptance.md`; the architecture file is `NN-architecture.md`
+  with `## 1. Repository layout` first); `templates/specs/implementation-plan.md` FND-04 no
+  longer cites a localization spec no small product has (`{{NN_L10N}}`, `{{NN_UX}}` gone from
+  its notes). **W7.5** (owner: the stage commits) `stages/C-operationalize.md` gains Step C5 —
+  the pack's first commit, with the hooks active, and the report names its hash; C4.5 reordered;
+  `SKILL.md` allows `git add *` and `git commit *`; `lock-guard.py --staged` says "no HEAD yet;
+  nothing is locked before the first commit" instead of a bare `clean`. **W7.6** (owner: cards
+  only for hosting/region/paid) `reference/surfaces.md` §Never a card lists language, framework
+  and libraries as `D-NNN`; `templates/specs/README.md` notes and `B-specify.md` B2.2 say where
+  each stack element's tag comes from, and B2 no longer has a hidden stop. **W7.7**
+  `check-docs.py` — `normative-tagged` scans `specs/README.md` too, and `--only RULE,RULE` scopes
+  a run with the summary counting the failures it dropped; `stages/A-elicit.md` Exit and
+  `B-specify.md` mechanical pass 4 use it (no more "ignore the failures about files that do not
+  exist yet"); `extract-normative.py` scans the spec map and prints per-file counts; F12 (ID
+  order after Stage A) and F14 (`Kind` = the folder name) reworded. `DOCUMENTATION.md` §8, §11.
+- Proved by: `test-lock-guard.sh` +1 (the no-HEAD message before the seed commit);
+  `test-check-docs.sh` +2 (an untagged statement in the spec map fails on its line; `--only`
+  keeps the named rule and reports the dropped count); `test-allowed-tools.sh` passes over the
+  new C5 command (`cd`, `git add`, `git commit`); `test-render.sh` unchanged and green — its
+  fixture already used the two fixed names. All seven suites green: 21 + 17 + 32 + 18 + 20 + 1
+  + 11 = 120 cases.
+- Left open: nothing in W7. Across the plan: only the live `/design-pack` session in the
+  owner's permission mode (W6 procedure) remains, and `Feature-Design.md` is the next piece of
+  work, outside this plan.

@@ -47,9 +47,10 @@ and waiting for the owner.
      recommendation ("can be deferred to Phase N"), so the owner can defer it in one word;
    - touches none: add it to the defaults ledger in the scratchpad (decision, alternatives,
      why). Stage B turns each into a `D-NNN` when it becomes a spec statement.
-5. Assign IDs in the order data, security, scope, external, ux, so IDs read in dependency order,
-   and append the events in that order: the projection renders cards in the order they were
-   opened. One event per card:
+5. Assign IDs in the order data, security, scope, external, ux, so the cards of this round read
+   in dependency order, and append the events in that order: the projection renders cards in
+   the order they were opened. Cards raised later (Stage B, the hunter) take the next free ID
+   whatever their surface; the index line carries the surface, so the order is still readable. One event per card:
    `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/log-append.py --root <target> --stream questions --type card-opened --payload-file -`
    with the payload on stdin (`id`, `title`, `surface`, `source`, `question`, `options` as a JSON
    array, `recommendation`, `blocks: specification`). The tool refuses a card whose options carry
@@ -84,8 +85,8 @@ and waiting for the owner.
 
 When no Blocking card lacks an Answer:
 
-1. Run `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --quiet`
-   and ignore failures about files that do not exist yet; fix any failure about `QUESTIONS.md`.
+1. Run `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --quiet --only cards,provenance,chain-intact,projection-fresh`:
+   the rules that can hold before any other document exists. Fix every failure it reports.
 2. Report: cards per surface (answered, deferred), the deferred cards with what they block, the
    size of the defaults ledger. State that Stage B starts on the owner's word and what its first
    round produces (a proposed file set, nothing written).

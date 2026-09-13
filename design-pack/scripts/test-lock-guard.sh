@@ -106,6 +106,11 @@ else
 fi
 
 git add -A
+if python3 scripts/lock-guard.py --staged > "$work/nohead.out" 2>&1 && grep -q 'no HEAD yet' "$work/nohead.out"; then
+    report ok "0 before the first commit the guard says nothing is locked yet, rather than a bare clean" ""
+else
+    report no "0 no-HEAD message" "$(cat "$work/nohead.out")"
+fi
 if git commit -q -m "seed" 2>"$work/seed.out"; then
     report ok "seed commit: a repository may be created under a hard-locked glob" ""
 else

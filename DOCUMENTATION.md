@@ -433,7 +433,7 @@ standard library, and it runs before any code exists.
 | `decisions` | D-IDs monotonic and contiguous, required fields present, ADRs carry approval, index matches |
 | `register` | the locked register carries only `[input]` or resolved `[Q-NNN]` |
 | `provenance` | every tag resolves; every resolved card is cited, unless superseded, in which case its successor must exist |
-| `normative-tagged` | every normative statement in `specs/` ends with a provenance tag (adopted packs exempt by declaration) |
+| `normative-tagged` | every normative statement in `specs/`, the spec map included, ends with a provenance tag (adopted packs exempt by declaration) |
 | `inferred-zero` | once the baseline is stamped, no `[inferred]` remains in `specs/`; before it, reported only |
 | `cards` | every open card has all six fields and a valid surface |
 | `chain-intact` | every hash recomputes, every `prev` links, `seq` is contiguous from 1 |
@@ -449,7 +449,10 @@ contract fails with a message naming the work package that will deliver it, so a
 a passing gate never look alike.
 
 `make check-docs` depends on `verify-chain`. It deliberately does **not** depend on the rebuild
-targets: that would repair a drifted projection instead of failing on it.
+targets: that would repair a drifted projection instead of failing on it. `check-docs.py --only
+RULE,RULE` scopes a run to the rules that can hold before every document exists (the stages use it
+before Stage C); its summary says how many failures of other rules it dropped, so a scoped run
+never reads as a clean one.
 
 `scripts/extract-normative.py` lists every normative statement with its file, section, line and
 tag. It runs after every writing round and its output is the hunter's input.
@@ -507,10 +510,10 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
-| `test-lock-guard.sh` | 20 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
+| `test-lock-guard.sh` | 21 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
 | `test-decisions-log.sh` | 17 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 32 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
-| `test-check-docs.sh` | 16 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
+| `test-check-docs.sh` | 18 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
 | `test-stage-detect.sh` | 11 | a target walked through every state — empty, inputs saved, cards Blocking, answered, deferred, spec map, files, `AGENTS.md`, baseline — with the verdict asserted at each, including a Blocking card raised during Stage B |
 | `test-allowed-tools.sh` | 1 | every backticked shell command in `stages/*.md` and `SKILL.md`, split into subcommands the way Claude Code matches them, is pre-approved by an `allowed-tools` pattern |
 | `test-render.sh` | 20 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, and one broken red line failing the gate |

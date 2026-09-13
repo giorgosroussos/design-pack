@@ -4,8 +4,9 @@ what was received, and what is authoritative. Renders to docs/inputs/README.md. 
 copied verbatim next to it (subfolders allowed: requirements/, mockups/, transcripts/, prior/).
 Placeholders:
   {{DATE}}
-  {{ROWS}}       one row per input file: File | Received | Kind (requirements, constraints,
-                 mockup, competitor reference, prior draft, transcript) | Authority
+  {{ROWS}}       one row per input file: File | Received | Kind | Authority
+                 Kind is the folder the file sits in under docs/inputs/: requirements,
+                 constraints, mockups, references, prior, transcripts (A-elicit.md A0.1)
                  Authority is one of:
                    authoritative — requirements source; statements from it are tagged [input]
                    authoritative (constraints) — fixes stack, deployment, jurisdiction, budget

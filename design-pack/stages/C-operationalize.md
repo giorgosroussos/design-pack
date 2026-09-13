@@ -127,16 +127,26 @@ nothing into `CLAUDE.md`.
    `projection-fresh` passing for both `DECISIONS.md` and `QUESTIONS.md`, and running each
    `rebuild-*` tool twice leaves its file unchanged the second time. If the rebuild is not byte-stable, `projection-fresh` will
    fail on a clean repository and the cause is the renderer, not the pack.
-5. The lock layer answers: `make check-locks` exits 0 with nothing staged,
-   `git config core.hooksPath` reads `.githooks`, and
+5. The lock layer answers: `git config core.hooksPath` reads `.githooks`, and
    `python3 scripts/lock-guard.py --tier docs/inputs/README.md` prints `hard-locked` while
    `--tier PLAN.md` prints `free`. A manifest that fails to parse exits 2 and is a Stage C
    failure, not a warning.
+
+## Step C5 — The first commit
+
+The lock layer judges diffs, so nothing is locked until something is committed; a pack handed
+over uncommitted is a pack whose locks are prose. When the target is a git repository, Stage C
+ends by making the pack's first commit, with the hooks already active from C1.6:
+`cd <target> && git add -A && git commit -m "Documentation pack: specification, operating layer, living documents"`.
+The pre-commit hook runs the guard over it (every path is new, so nothing is refused) and from
+this commit on `docs/inputs/**`, the guard, the hooks and the manifest are hard-locked in fact.
+Then `make check-locks` exits 0 with nothing staged. If the owner has asked that the skill never
+commit, say so in the report instead and name the command the owner runs.
 
 ## Exit
 
 Report: files generated with sizes, `AGENTS.md` size against the ceiling, red-line count,
 `check-docs` result, and the lock layer: hooks active or not, how many files were set read-only,
-and the tier of each locked path. For an adopted pack, present the conflict cards of §Adopted
+the tier of each locked path, and the first commit's hash (or the command the owner runs). For an adopted pack, present the conflict cards of §Adopted
 packs step 4 as a batch. State that Stage D runs the assumption hunter and then asks the owner to
 read the pack. Stop.

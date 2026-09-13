@@ -5,6 +5,10 @@ file, section and provenance tag.
 
     python3 extract-normative.py [--specs DIR] [--untagged] [--untagged-as TAG] [--format tsv|md]
 
+The spec map (`specs/README.md`) is scanned too: its product statement and technology
+baseline carry tags. The trailing comment lines on stderr give the counts by provenance,
+in total and per file, which is what the round reports ask for.
+
 A statement is normative when it contains MUST, MUST NOT, SHALL, SHALL NOT,
 SHOULD, SHOULD NOT or MAY in capitals outside a code span. A lead-in line ending
 with `MUST:` (or another keyword and a colon) makes every list item that follows,
@@ -54,7 +58,11 @@ def main():
 
     normative_statements = load_detector()
     rows = []
-    for path in sorted(glob.glob(os.path.join(args.specs, "[0-9][0-9]-*.md"))):
+    paths = sorted(glob.glob(os.path.join(args.specs, "[0-9][0-9]-*.md")))
+    readme = os.path.join(args.specs, "README.md")
+    if os.path.isfile(readme):
+        paths.append(readme)   # the spec map is a tagged location (reference/provenance.md)
+    for path in paths:
         name = os.path.basename(path)
         is_register = name.endswith("-decision-register.md")
         with open(path, encoding="utf-8") as fh:
@@ -64,7 +72,7 @@ def main():
                 tag = args.untagged_as or "(none)"
             if args.untagged and tag != "(none)":
                 continue
-            rows.append((name[:2], section, str(ln), tag, statement[:160]))
+            rows.append((name[:2] if name != "README.md" else "README", section, str(ln), tag, statement[:160]))
 
     if args.format == "md":
         print("| Spec | § | Line | Provenance | Statement |")
@@ -75,12 +83,16 @@ def main():
         print("spec\tsection\tline\tprovenance\tstatement")
         for r in rows:
             print("\t".join(r))
-    counts = {}
+    counts, per_file = {}, {}
     for r in rows:
         k = r[3] if not r[3].startswith(("Q-", "D-")) else r[3][:1]
         counts[k] = counts.get(k, 0) + 1
+        per_file.setdefault(r[0], {}).setdefault(k, 0)
+        per_file[r[0]][k] += 1
     print("# %d normative statements; by provenance: %s" % (
         len(rows), ", ".join("%s=%d" % kv for kv in sorted(counts.items()))), file=sys.stderr)
+    for spec in sorted(per_file):
+        print("#   %s: %s" % (spec, ", ".join("%s=%d" % kv for kv in sorted(per_file[spec].items()))), file=sys.stderr)
     return 0
 
 

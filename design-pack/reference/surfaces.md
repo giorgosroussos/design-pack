@@ -28,6 +28,9 @@ Drawn from the exemplar project; use them as calibration, not as domain content.
 These touch none of the five surfaces. Decide, record a `D-NNN` with the alternatives you rejected, and do not ask:
 
 - test runner, formatter, linter, static-analysis level, type checker
+- the language, framework and libraries when the inputs leave them open: a `D-NNN` with the
+  alternatives weighed, never a card (the hosting provider, the region and anything paid are
+  `external` and are cards; see trap 1)
 - directory layout and naming inside the layout the requirements fix
 - library choice within the fixed stack (an ORM plugin, a validation helper, a UI component library that does not change the navigation)
 - local ports, container names, environment variable names

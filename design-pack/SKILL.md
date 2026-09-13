@@ -30,6 +30,8 @@ allowed-tools:
   - Bash(cp *)
   - Bash(chmod *)
   - Bash(git config core.hooksPath*)
+  - Bash(git add *)
+  - Bash(git commit *)
   - Bash(find *)
   - Bash(grep *)
 ---

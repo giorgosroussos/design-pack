@@ -256,5 +256,26 @@ else
 fi
 rm -f AGENTS.md DECISIONS.md
 
+# --- normative-tagged covers the spec map; --only scopes a run ------------------
+
+mkdir -p specs
+printf '# Specs\n\n## Product statement\n\n> The tool MUST record entries.\n\n## Technology baseline\n\n- Python. [input]\n' > specs/README.md
+if probe 'cd.check_normative(root, False)' > "$work/rm1.out" 2>&1; then
+    report no "normative-tagged: untagged MUST in specs/README.md" "not reported"
+elif grep -q 'FAIL normative-tagged specs/README.md:5' "$work/rm1.out"; then
+    report ok "normative-tagged: an untagged statement in the spec map fails on its line" ""
+else
+    report no "normative-tagged: spec map" "$(cat "$work/rm1.out")"
+fi
+rm -rf specs docs
+mkdir -p specs; printf '# S\n\n## 1. X\n\n- It MUST work.\n' > specs/01-x.md
+out="$(python3 scripts/check-docs.py --quiet --only normative-tagged 2>&1)"
+if echo "$out" | grep -q '^FAIL normative-tagged' && ! echo "$out" | grep -q '^FAIL packages' && echo "$out" | grep -q 'failure(s) of other rules dropped by --only'; then
+    report ok "--only keeps the named rule's failures and says how many others it dropped" ""
+else
+    report no "--only" "$(echo "$out" | head -8)"
+fi
+rm -rf specs
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

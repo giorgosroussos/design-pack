@@ -4,8 +4,10 @@ Placeholders:
   {{PRODUCT_NAME}}            short product name
   {{PRODUCT_STATEMENT}}       one or two sentences, what it is and what it is not, tagged
   {{PRODUCT_PARAGRAPH}}       who it serves, the core loop, the one operational property that must hold
-  {{TECH_BASELINE_BULLETS}}   one bullet per fixed stack element, each with a provenance tag;
-                              if the stack is open, one bullet: "Not fixed by the requirements; see Q-NNN"
+  {{TECH_BASELINE_BULLETS}}   one bullet per stack element, each with a provenance tag: [input] when
+                              the constraints fix it, [Q-NNN] for the hosting provider, region and
+                              anything paid (external), [D-NNN] for a language, framework or library
+                              the inputs leave open (a default with alternatives, never a card)
   {{FILE_TABLE_ROWS}}         one row per spec file, in number order, domain files then
                               traceability, decision-register, implementation-plan, agent-playbook
   {{NN_REGISTER}}             number of the decision register file

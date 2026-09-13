@@ -15,7 +15,11 @@ produces a Blocking card.
    entity; content or catalogue; the core operational workflow; users and authorization; API
    contracts (if an API); UX and journeys (if a UI); notifications; security, privacy and
    retention; infrastructure and operations; testing and acceptance. Then the fixed tail in
-   this order: traceability, decision-register, implementation-plan, agent-playbook.
+   this order: traceability, decision-register, implementation-plan, agent-playbook. Two names
+   are fixed because the templates cite them: the testing file is `NN-testing-acceptance.md`,
+   and the architecture file is `NN-architecture.md` with `## 1. Repository layout` as its
+   first section (`PLAN.md` and `AGENTS.md` cite `` `NN` §1 `` for the layout). The rest are
+   `NN-kebab-name.md` as the domain suggests.
 2. Present a table: number, file name (`NN-kebab-name.md`), purpose in one line, and which
    inputs and cards feed it. Keep domain files small enough to be read in one sitting (the
    exemplar's are 2.5–5 KB each). Fourteen domain files is a lot; six is fine for a small product.
@@ -37,8 +41,11 @@ produces a Blocking card.
      `log-append.py` refuses.
    - `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/rebuild-decisions.py --root <target>`.
 2. Render `specs/README.md` from its template with the approved file table. Status stays
-   `Draft`. The technology baseline comes from the constraints (`[input]`) or from answered
-   cards (`[Q-NNN]`); a stack element nobody fixed is a card, not a guess.
+   `Draft`. The technology baseline comes from the constraints (`[input]`), from answered cards
+   (`[Q-NNN]`), or from defaults: a language, framework or library the inputs leave open is a
+   `D-NNN` with alternatives (`reference/surfaces.md` §Never a card), while the hosting provider,
+   the region and anything paid are `external` and are cards — normally raised in Stage A by the
+   elicitation checklist, so B2 has nothing to stop for.
 3. Run the mechanical pass (below).
 
 ## Round B3 — Domain files, at most four per pass (B3.1, B3.2, …)
@@ -80,10 +87,10 @@ Mechanical pass after every round:
    (Stage A batch form), wait, record the owner's answers or deferrals as events, rebuild, then
    continue. A card the owner has not seen is never deferred by the skill; where the answer
    only matters later, the recommendation says so and the owner defers in one word.
-4. `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --quiet`;
-   only citation, marker and decision failures are actionable before the root documents exist.
-   From B2 onward `chain-intact` and `projection-fresh` run too and both must pass: a failure
-   there means an entry was hand-written or a log line was edited.
+4. `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --quiet --only citations,markers,decisions,cards,register,provenance,normative-tagged,chain-intact,projection-fresh`:
+   the rules that can hold before the root documents exist; every failure it reports is
+   actionable. `chain-intact` and `projection-fresh` must pass from B2 on: a failure there means
+   an entry was hand-written or a log line was edited. The full run is Stage C's.
 5. Report in one paragraph: files written, statements by provenance, cards created, defaults
    recorded. Continue to the next round in the same turn unless a stop was triggered.
 
