@@ -30,6 +30,9 @@ Placeholders:
                                tooling the specs leave open ("chosen in DECISIONS.md")
   {{CONTRACT_DRIFT_TARGET_LINE}}  `make openapi        # ...` line or nothing
   {{INFRA_SERVICES}}
+  Section 7 (Prompt selection) is VERBATIM apart from {{NN_PLAN}}: it is policy over the
+  characteristics the plan stores, and a pack that reworded it would fail `task-policy`, which
+  reads the table. It costs about 1 KB against the 20 KB ceiling.
   {{DESIGN_DIRECTION_SECTION}} present only when visual inputs exist: "## Design direction from <input>"
                                with the principles to carry and the cards holding the conflicts.
                                It is the last section by design (section 8). Otherwise omit it.
@@ -120,7 +123,17 @@ CI (FND-02) runs on every merge request and every push to the default branch. Ea
 
 Work in the smallest useful vertical slice, following the task packet of `{{NN_PLAYBOOK}}` §2 and §4: one task ID and outcome, exact spec sections, dependencies merged, allowed file surface and shared-file owner, executable acceptance criteria, explicit non-goals. Before coding, inspect current code and tests, restate assumptions and flag conflicts with locked decisions (`{{NN_PLAYBOOK}}` §3). Implement, add tests in the same change, run targeted then broader suites, regenerate contract artifacts when contracts change, and report changed behaviour, migration and rollback implications and remaining risks.
 
-Definition of Ready and Done are `{{NN_PLAYBOOK}}` §5–6. Review runs as separate bounded passes after implementation: correctness, security and isolation, tests, UX and accessibility (`{{NN_PLAYBOOK}}` §7). Critical and high findings block merge. Parallel work follows the lanes in `{{NN_PLAN}}` §{{PLAN_PARALLEL_SECTION}}; never parallelize migrations for the same aggregate or concurrent edits to central policies or the contract root without explicit ownership. Product Owner checkpoints are `{{NN_PLAYBOOK}}` §12. The release gate is `{{NN_TESTING}}` §{{TESTING_RELEASE_SECTION}} together with the last phase's exit criteria in `{{NN_PLAN}}` §{{PLAN_LAST_PHASE_SECTION}}.
+Definition of Ready and Done are `{{NN_PLAYBOOK}}` §5–6. Review runs as separate bounded passes after implementation, when the table in the next section selects it: correctness, security and isolation, tests, UX and accessibility (`{{NN_PLAYBOOK}}` §7). Critical and high findings block merge. Parallel work follows the lanes in `{{NN_PLAN}}` §{{PLAN_PARALLEL_SECTION}}; never parallelize migrations for the same aggregate or concurrent edits to central policies or the contract root without explicit ownership. Product Owner checkpoints are `{{NN_PLAYBOOK}}` §12. The release gate is `{{NN_TESTING}}` §{{TESTING_RELEASE_SECTION}} together with the last phase's exit criteria in `{{NN_PLAN}}` §{{PLAN_LAST_PHASE_SECTION}}.
+
+## Prompt selection
+
+`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds three session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Surfaces`, `Touches red line` and `Contract change`; the first two are derived from the sections the package cites and `make check-docs` verifies them, the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four.
+
+| Prompt | Run when |
+| --- | --- |
+| 1 — Implement | Always. |
+| 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
+| 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness, and there is no security, isolation or contract dimension for a review to add. |
 
 ## Living documents
 

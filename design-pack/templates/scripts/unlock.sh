@@ -40,12 +40,16 @@ printf -- '- unlock %s path="%s" by="%s" reason="%s"\n' "$when" "$target" "$who"
 git add -- "$log"
 
 chmod u+w -- "$target"
+# Appended, not overwritten: one commit may carry several ceremonies (a spec, the
+# plan and the playbook in one migration), the guard authorizes each from its
+# record in UNLOCKS.md, and the token has to name every one of them or the commit
+# that follows re-locks only the last. Both readers take every `path:` line.
 {
     echo "path: $target"
     echo "by: $who"
     echo "date: $when"
     echo "reason: $reason"
-} > "$token"
+} >> "$token"
 
 echo "unlock: $target is writable for one commit."
 echo "unlock: recorded in $log; the next commit consumes the token."

@@ -82,6 +82,7 @@ DEFAULT_LOG = "UNLOCKS.md"
 NO_NEWLINE = r"\ No newline at end of file"
 UNLOCK_RE = re.compile(r'^\s*-\s+unlock\s+\S+\s+path=(?:"([^"]*)"|(\S+))')
 HEADER_RE = re.compile(r'^diff --git "?a/(.*?)"? "?b/(.*?)"?$')
+BINARY_RE = re.compile(r'^Binary files (.*?) and (.*?) differ$')
 
 
 class ManifestError(Exception):
@@ -240,6 +241,21 @@ def parse_diff(text):
                 cur["mode_change"] = True
                 i += 1
                 continue
+            # A binary addition carries no `--- /dev/null` line: git prints one
+            # `Binary files ... differ` line and nothing else. The extended
+            # header is the one announcement every diff makes, text or binary,
+            # so it is what `new_file` and `deleted` are read from. Without this
+            # a pack whose raw inputs hold a mockup or an archive cannot make its
+            # own first commit: the addition reads as a modification of a
+            # hard-locked path.
+            if line.startswith("new file mode "):
+                cur["new_file"] = True
+                i += 1
+                continue
+            if line.startswith("deleted file mode "):
+                cur["deleted"] = True
+                i += 1
+                continue
             if line.startswith("rename from "):
                 entry(unquote(line[len("rename from "):]))["deleted"] = True
                 i += 1
@@ -250,6 +266,12 @@ def parse_diff(text):
                 continue
             if line.startswith("Binary files ") or line.startswith("GIT binary patch"):
                 cur["binary"] = True
+                m = BINARY_RE.match(line)
+                if m:
+                    if side_path(m.group(1)) is None:
+                        cur["new_file"] = True
+                    if side_path(m.group(2)) is None:
+                        cur["deleted"] = True
                 i += 1
                 continue
 

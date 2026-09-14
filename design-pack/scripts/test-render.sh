@@ -88,6 +88,10 @@ P = {
     "INFRA_SERVICES": "PostgreSQL",
     "PRIMARY_DB": "PostgreSQL 16",
     "STACK_SCAFFOLD_BULLET": "Create the single service application and its test harness as `02` §1 lays them out.",
+    # The two derived lines are what `--task all` prints for this fixture; `Contract change`
+    # is the judgement Stage B records (FND-01 defines the command contract, FND-02 does not).
+    "FND01_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: yes",
+    "FND02_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: no",
     "STACK_LINE": "one Python service, PostgreSQL, no web UI in MVP.",
     "ONE_LINE": "A single-user bookkeeping notebook: entries in, monthly totals out. Not an accounting system, not multi-user.",
     # PLAN.md
@@ -151,7 +155,7 @@ P = {
     ]),
     # specs/decision-register.md
     "DATA_BULLETS": "- An entry belongs to exactly one notebook; a notebook to exactly one keeper. [input]",
-    "SECURITY_BULLETS": "- Notebooks are private to their keeper; no sharing in MVP. [Q-001]",
+    "SECURITY_BULLETS": "- Notebooks are private to their keeper; no sharing in MVP (`01` §2). [Q-001]",
     "SCOPE_BULLETS": "- No web UI and no API in MVP. [input]",
     "EXTERNAL_BULLETS": "No locked decision on this surface.",
     "UX_BULLETS": "No locked decision on this surface.",
@@ -167,10 +171,16 @@ P = {
         "`LDG-01` Notebook and entry model with migrations",
         "",
         "- Notebook and entry tables with the ownership constraint of `01` §2.",
+        "- Surfaces: security",
+        "- Touches red line: yes",
+        "- Contract change: yes",
         "",
         "`LDG-02` Monthly totals",
         "",
         "- Totals derived at read time (`01` §3); the pending retention card Q-002 is resolved before this package starts.",
+        "- Surfaces: —",
+        "- Touches red line: yes",
+        "- Contract change: no",
         "",
         "### Exit criteria",
         "",
@@ -524,6 +534,19 @@ else
     report no "7 red-lines" "$(grep -E '^FAIL' "$work/cd7.out")"
 fi
 git checkout -q -- AGENTS.md
+
+# --- 8. the plan's stored characteristics are held to the pack's own data -------
+
+chmod u+w "specs/07-implementation-plan.md"
+sed -i 's/^- Surfaces: security$/- Surfaces: data/' "specs/07-implementation-plan.md"
+if check_docs > "$work/cd8.out" 2>&1; then
+    report no "8 a stored Surfaces that disagrees with the cited sections passes" "check-docs exited 0"
+elif grep -q 'FAIL task-policy' "$work/cd8.out" && grep -q 'LDG-01' "$work/cd8.out"; then
+    report ok "8 a hand-edited characteristic fails the gate, naming the package" ""
+else
+    report no "8 task-policy" "$(grep -E '^FAIL' "$work/cd8.out" | head -3)"
+fi
+git checkout -q -- "specs/07-implementation-plan.md"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

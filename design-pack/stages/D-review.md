@@ -53,7 +53,10 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
 2. Stop. The owner reads and returns corrections.
 3. Corrections change spec text (Stage B writing rules, tags kept current), the register, the
    living documents, and `AGENTS.md` where a red line or citation moved. Section numbers do not
-   change. After corrections, rerun D1 and D2. Present the delta and stop again.
+   change. A correction that moves a red line, a `[Q-NNN]` tag or a package's citations also moves
+   a derived characteristic: re-run `cd <target> && python3 scripts/check-docs.py --task all` and
+   copy the printed `Surfaces` and `Touches red line` onto the packages that changed, before the
+   mechanical pass. After corrections, rerun D1 and D2. Present the delta and stop again.
 
 ## Round D4 — Freeze (on the owner's explicit word only)
 

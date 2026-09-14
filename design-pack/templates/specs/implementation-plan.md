@@ -6,6 +6,27 @@ remaining packages contiguous (FND-01, FND-02, FND-03).
 Domain phases: one section per phase, in dependency order, each with Goal, Work packages
 (stable IDs `AAA-NN`, three-letter prefix per phase, bullets = outcomes, not tasks) and Exit
 criteria that a test or a command can demonstrate. Every package gets a TRACEABILITY.md row.
+Every package ALSO ends with its three characteristics, one per line, which the prompt-selection
+table in AGENTS.md reads:
+  - Surfaces:            the surfaces the sections this package cites resolve to, in the order
+                         data, security, scope, external, ux; an empty set is written as a dash.
+                         DERIVED, never judged: a `[Q-NNN]` statement contributes its card's
+                         surface, a register bullet the surface of its heading.
+  - Touches red line:    yes | no. DERIVED: yes iff a red line in AGENTS.md cites a section this
+                         package cites.
+  - Contract change:     yes | no. The plan author's JUDGEMENT at Stage B (does this package
+                         define or modify an interface, API or schema contract), recorded like any
+                         other implementation call. `check-docs` checks it is there and boolean;
+                         it never recomputes it.
+Do not write them by hand: `python3 scripts/check-docs.py --task all` prints the derived pair for
+every package, and the `task-policy` rule fails the build when a stored value and the pack
+disagree. There is no fourth field: `blocked-by` is read from QUESTIONS.md at run time, so a card
+can be resolved without unlocking this file.
+Placeholders:
+  {{FND01_CHARACTERISTICS}} {{FND02_CHARACTERISTICS}} {{FND03_CHARACTERISTICS}} {{FND04_CHARACTERISTICS}}
+                           the three lines for each Phase 0 package (FND-03/FND-04 only when their
+                           conditional block is kept). Domain packages carry their own three lines
+                           inside {{DOMAIN_PHASES}}.
 Placeholders:
   {{DEPENDENCY_GRAPH}}     mermaid flowchart of phases
   {{STACK_SCAFFOLD_BULLET}} what FND-01 scaffolds ("Create the API app, the two SPAs, ..."), from the architecture spec
@@ -44,6 +65,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 - {{STACK_SCAFFOLD_BULLET}}
 - Local Compose (or equivalent) for {{INFRA_SERVICES}}; environment examples; lockfiles committed.
 - `make verify` runs every gate the testing specification requires that exists at this point; `make clean-start` proves a fresh clone boots, verifies and tears down.
+{{FND01_CHARACTERISTICS}}
 
 `FND-02` CI baseline
 
@@ -52,6 +74,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 - `make check-docs` runs as its own job.
 - Every gate the testing specification requires but nothing implements yet is a failing-forward tripwire: a job that passes only while the gate is provably absent and fails with promotion instructions the moment it becomes runnable. A missing gate and a silently passing gate must never look alike.
 - Dependency and secret scanning; artifact and cache strategy; no job retries.
+{{FND02_CHARACTERISTICS}}
 
 <!-- if:API -->
 `FND-03` API and observability conventions
@@ -59,6 +82,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 - Versioned base path, standard error envelope with a correlation ID, structured logging, health endpoints (`{{NN_API}}`).
 - Generated contract and generated client; the drift check target fails when a route changes without regeneration.
 - Error-monitoring seam with a local or staging test path.
+{{FND03_CHARACTERISTICS}}
 <!-- /if -->
 
 <!-- if:UI -->
@@ -67,6 +91,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 - Shared tokens and base components, focus and error patterns, responsive shell.
 - Localization skeleton with the fallback rule the UX spec states; no hard-coded UI strings.
 - Automated accessibility smoke test wired as a real gate, replacing its tripwire.
+{{FND04_CHARACTERISTICS}}
 <!-- /if -->
 
 ### Exit criteria

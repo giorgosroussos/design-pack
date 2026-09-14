@@ -115,8 +115,20 @@ Render from the template. For each compiled placeholder:
 - **Design direction.** Only when a visual input exists: the principles to carry, and the card
   IDs that hold each conflict.
 
+- **Prompt selection.** Verbatim from the template; only `{{NN_PLAN}}` is substituted. The table
+  is policy over the characteristics the plan stores, and `check-docs` reads it: a renamed
+  characteristic or a prompt that does not exist fails `task-policy`. Do not tune the conditions
+  here; the owner tunes them later, in this file, without unlocking `specs/`.
+
 Then check the size. Above 20 KB, compress the red lines and the topology paragraph; move
 nothing into `CLAUDE.md`.
+
+Finally, recompute one derived field. The red lines exist only now, so `Touches red line` in the
+implementation plan was written against an absent `AGENTS.md` at Stage B:
+`cd <target> && python3 scripts/check-docs.py --task all`, then write the printed value onto every
+package whose line disagrees. It is mechanical and carries no judgement; `specs/` is still free, so
+it needs no ceremony, and `task-policy` fails in Step C4 if it is skipped. `Surfaces` and
+`Contract change` are not touched here.
 
 ## Step C4 — Mechanical pass
 

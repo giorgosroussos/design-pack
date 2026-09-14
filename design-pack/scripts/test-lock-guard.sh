@@ -217,6 +217,37 @@ git reset -q HEAD docs/inputs/requirements.md
 git checkout -- docs/inputs/requirements.md
 chmod 0444 docs/inputs/requirements.md
 
+# --- 4h. two ceremonies in one commit: both authorized, both re-locked --------
+# A migration touches several locked files at once. The guard reads each unlock
+# record from UNLOCKS.md, so all of them are authorized; the re-lock afterwards
+# has to cover all of them too, or the next commit finds a writable locked file.
+
+printf 'A second input page.\n' > docs/inputs/second.md
+git add docs/inputs/second.md && git commit -q -m "add a second input page"
+chmod 0444 docs/inputs/second.md
+if unlock_cmd docs/inputs/requirements.md "migration: first of two" \
+   && unlock_cmd docs/inputs/second.md "migration: second of two"; then
+    printf 'Edited under the first ceremony.\n' >> docs/inputs/requirements.md
+    printf 'Edited under the second ceremony.\n' >> docs/inputs/second.md
+    git add docs/inputs/requirements.md docs/inputs/second.md
+    if guard; then
+        report ok "4h two ceremonies in one commit: the guard authorizes both paths" ""
+    else
+        report no "4h two ceremonies" "$(cat "$work/guard.out" 2>/dev/null)"
+    fi
+    git commit -q -m "two ceremonies, one commit" >/dev/null 2>&1
+    m1="$(ls -l docs/inputs/requirements.md | cut -c1-10)"
+    m2="$(ls -l docs/inputs/second.md | cut -c1-10)"
+    if [ "$m1" = "-r--r--r--" ] && [ "$m2" = "-r--r--r--" ]; then
+        report ok "4h2 both unlocked files are read-only again after the commit" ""
+    else
+        report no "4h2 re-locking after two ceremonies" "requirements=$m1 second=$m2"
+    fi
+else
+    report no "4h two ceremonies" "$(cat "$work/unlock.out")"
+fi
+chmod u+w docs/inputs/requirements.md docs/inputs/second.md 2>/dev/null || true
+
 # --- 4f. the ceremony when the commit deletes the unlocked path ---------------
 # post-commit must consume the token even when there is nothing left to re-lock.
 
@@ -485,6 +516,26 @@ diff --git a/.log/events.jsonl b/.log/events.jsonl
 +{"seq":2,"hash":"bbbb"}
 +{"seq":3,"hash":"cccc"}
 """, (), 0),
+    ("a NEW binary file under a hard-locked glob is an addition, not a change", """
+diff --git a/docs/inputs/mockups/board.zip b/docs/inputs/mockups/board.zip
+new file mode 100644
+index 0000000..23f5aa5
+Binary files /dev/null and b/docs/inputs/mockups/board.zip differ
+""", (), 0),
+    ("a CHANGED binary file under a hard-locked glob still needs the ceremony", """
+diff --git a/docs/inputs/mockups/board.zip b/docs/inputs/mockups/board.zip
+index 23f5aa5..91b2c0d 100644
+Binary files a/docs/inputs/mockups/board.zip and b/docs/inputs/mockups/board.zip differ
+""", (), 1),
+    ("a new text file under a hard-locked glob, from the extended header alone", """
+diff --git a/docs/inputs/requirements/brief.md b/docs/inputs/requirements/brief.md
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/docs/inputs/requirements/brief.md
+@@ -0,0 +1 @@
++What I need.
+""", (), 0),
     ("free path, rewritten wholesale", """
 diff --git a/PLAN.md b/PLAN.md
 --- a/PLAN.md
@@ -508,7 +559,7 @@ for b in bad:
 sys.exit(1 if bad else 0)
 UNITEOF
 then
-    report ok "6 policy unit cases over crafted diffs (21 cases)" ""
+    report ok "6 policy unit cases over crafted diffs (24 cases)" ""
 else
     report no "6 policy unit cases" "see the lines above"
 fi

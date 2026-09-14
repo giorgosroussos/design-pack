@@ -626,6 +626,46 @@ Acceptance:
 
 ---
 
+## W9 — The loop prompts have no selection rule
+
+Status: done
+
+`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` ships three prompts: 1 implements the `Now` item, 2 reviews a
+finished slice, 3 resolves the cards blocking a package. Prompt 1 always runs; nothing in a
+generated pack said when the other two do. An orchestrator therefore either ran all three on every
+task, spending a session on passes whose dimension the package does not have, or kept the policy
+in its own head, where it drifts from the specs it is supposed to follow.
+
+The fix keeps the pack's existing separation rather than adding a new one. The plan states **data**:
+each work package carries `Surfaces`, `Touches red line` and `Contract change`. `AGENTS.md` states
+**policy**: one table mapping those to the prompts to run. The pack never says "run a review here";
+it says "this package touches security", and the table says what that implies. Four treatments,
+deliberately distinct:
+
+| Characteristic | Treatment | Where |
+| --- | --- | --- |
+| `Surfaces` | derived from the cards and register bullets the package's cited sections resolve to; recomputed by the gate | stored on the package |
+| `Touches red line` | derived: yes iff a red line cites a section the package cites; recomputed by the gate | stored on the package |
+| `Contract change` | the plan author's judgement at Stage B, recorded as an implementation decision; checked for presence and shape only | stored on the package |
+| `blocked-by` | live: the open cards whose `Blocks:` names the package | never stored |
+
+Collapsing any two of those is where this goes wrong. A derived value that is judged drifts when a
+decision changes; a judgement the gate recomputes is not a judgement; and a `blocked-by` frozen
+into the plan would make resolving a card a ceremonial unlock of a hard-locked file.
+
+The table lives in `AGENTS.md`, the free tier, so the policy can be tuned without unlocking
+`specs/`; the characteristics live in the plan, which the freeze hard-locks, so the data the policy
+runs on cannot drift. `task-policy` reads both, so a renamed characteristic or a typo in the table
+fails the build instead of silently selecting nothing.
+
+Acceptance:
+- [x] `scripts/test-task-policy.sh` green, including the six cases the item specified.
+- [x] `scripts/test-render.sh` proves a rendered pack passes the new rule, and that a hand-edited
+      characteristic fails it.
+- [x] The seven other suites unchanged and green.
+
+---
+
 ## Not in scope
 
 - Signed unlock records / server-side approval (see W5 — would change the threat model).
@@ -921,3 +961,44 @@ Append-only. One entry per session per item touched. Form:
   Stage C; if "Do you want to create …" still appears for the pack's files, the grant needs a
   path-scoped `Write(...)` rule instead of the bare tool name, and that is the one thing the run
   will settle. W8.5's second bullet stays as a ½-hour item.
+
+### 2026-09-14 — W9 — done
+- Changed: `design-pack/templates/scripts/check-docs.py` (the `task-policy` rule, the
+  `--task PACKAGE|all` reader, and the derivation helpers the two share);
+  `design-pack/templates/specs/implementation-plan.md` (the three characteristics per package and
+  the `{{FNDnn_CHARACTERISTICS}}` placeholders); `design-pack/templates/AGENTS.md` (the verbatim
+  `## Prompt selection` section and its table); `design-pack/templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`
+  (the preamble that tells a session to read the characteristics and the table before running
+  anything); `design-pack/stages/B-specify.md` B5 (derive and write the stored fields, record
+  `Contract change` as one decision), `C-operationalize.md` C3 (compile the table; recompute
+  `Touches red line` once the red lines exist), `D-review.md` D3 (recompute after a correction
+  moves a red line); `design-pack/SKILL.md` files table; `DOCUMENTATION.md` §1, §8 and §11.
+  New: `design-pack/scripts/test-task-policy.sh`.
+- Proved by: eight suites green — 14 + 22 + 18 + 2 + 22 + 17 + 34 + 11 = 140 cases
+  (`test-task-policy.sh` new at 14; `test-render.sh` 21 → 22). The derivation was also run
+  read-only over the live trial pack (`--task all`, 22 packages): ACC-04 reports
+  `blocked-by: Q-004` from the one open card, and the packages that touch no surface report the
+  dash rather than a guess.
+- Left open: nothing. Packs generated before this change carry no characteristics, so their
+  `task-policy` fails until the three lines are added per package; that is the intended migration
+  and `--task all` prints the two derived values to paste.
+
+### 2026-09-14 — W9 follow-up, three defects found by two real packs — done
+- Changed: `design-pack/templates/scripts/lock-guard.py` — a diff that ADDS a binary file carries
+  no `--- /dev/null` line, only `Binary files ... differ`, so an addition under a hard-locked glob
+  read as a modification and refused the pack's own first commit; `new file mode` and
+  `deleted file mode` in the extended header are now what an addition and a deletion are read
+  from, text and binary alike.
+  `design-pack/templates/scripts/check-docs.py` — a work package written as one line carries its
+  citations on that line, and `plan_package_blocks` excluded the title line, so such a package
+  derived `Surfaces: —` however much it touched; the title line is part of the block now.
+  `design-pack/templates/scripts/unlock.sh` and `templates/githooks/post-commit` — each ceremony
+  overwrote the token, so a commit carrying several unlocks re-locked only the last path; the
+  token accumulates now and post-commit also re-locks from the manifest (`--relock`).
+- Proved by: eight suites green — 24 + 22 + 15 + 18 + 34 + 17 + 2 + 11 = 143 cases.
+  `test-lock-guard.sh` +3 unit cases (new binary, changed binary, new text from the header alone)
+  and +2 ceremony cases (two unlocks in one commit: both authorized, both re-locked);
+  `test-task-policy.sh` +1 (the one-line package form).
+- Left open: nothing. All three predate W9 and were invisible to the fixture packs, which hold no
+  binary input, write every package as a bulleted block, and never run two ceremonies at once.
+

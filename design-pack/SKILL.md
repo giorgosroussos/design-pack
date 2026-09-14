@@ -175,6 +175,7 @@ unacceptable state.
 | `templates/log-README.md` | the log's own README: canonical form, and what the chain does not guarantee |
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |
+| `scripts/test-task-policy.sh` | the `task-policy` rule and the `--task` reader over a fixture pack: derived characteristics, the policy table, and `blocked-by` as a live read |
 | `scripts/test-render.sh` | renders every template for a fixture product and proves the result passes the whole gate, the lock layer and `stage-detect` |
 | `scripts/test-allowed-tools.sh` | every shell command the stage files instruct matches a `Bash(...)` pattern of this file's `allowed-tools`, subcommand by subcommand |
 | `scripts/test-stage-detect.sh` | walks a target through every state and asserts `stage-detect` names each one |

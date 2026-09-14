@@ -1,0 +1,343 @@
+#!/bin/sh
+# Acceptance test for the `task-policy` rule and the `--task` reader of
+# check-docs.py: a small fixture pack whose plan, specs, cards and red lines are
+# just enough to derive the two derived characteristics, then one case per way
+# the data and the policy can disagree.
+#
+#   scripts/test-task-policy.sh [--keep]
+#
+# The rule-level suite for every other rule is test-check-docs.sh; the whole gate
+# over the shipped templates is test-render.sh. Exits non-zero if any case
+# behaves wrong.
+set -u
+
+here="$(cd "$(dirname "$0")/.." && pwd)"
+tpl="$here/templates"
+work="$(mktemp -d)"
+keep=""
+[ "${1:-}" = "--keep" ] && keep=1
+
+pass=0
+fail=0
+
+report() {
+    if [ "$1" = "ok" ]; then
+        pass=$((pass + 1)); printf '  PASS  %s\n' "$2"
+    else
+        fail=$((fail + 1)); printf '  FAIL  %s: %s\n' "$2" "$3"
+    fi
+}
+cleanup() { if [ -n "$keep" ]; then printf '\nkept: %s\n' "$work"; else rm -rf "$work"; fi; }
+trap cleanup EXIT
+
+repo="$work/repo"
+mkdir -p "$repo/scripts" "$repo/specs"
+cd "$repo" || exit 2
+cp "$tpl/scripts/check-docs.py" scripts/check-docs.py
+
+# probe: load check-docs.py, run the rule, print its FAIL lines, exit 1 if any.
+probe() {
+    python3 - "$1" <<'PROBEEOF'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("checkdocs", "scripts/check-docs.py")
+cd = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(cd)
+root = os.path.abspath(".")
+cards, resolved, superseded = cd.parse_cards(root)
+exec(sys.argv[1])
+for line in cd.failures:
+    print(line)
+sys.exit(1 if cd.failures else 0)
+PROBEEOF
+}
+rule() { probe 'cd.check_task_policy(root, cards)'; }
+
+# --- the fixture ---------------------------------------------------------------
+# `01` §2 carries a [Q-001] statement and is cited by a register bullet under
+# Security, so it resolves to the security surface and nothing else does. A red
+# line cites the same section. PKG-01 cites `01` §2, PKG-02 cites `01` §1.
+
+fixture() {
+    cat > specs/01-scope.md <<'EOF'
+# Scope
+
+## 1. Purpose
+
+The tool records entries and totals them. Nothing here fixes a surface.
+
+## 2. Access
+
+- A notebook MUST be readable by its keeper only. [Q-001]
+EOF
+
+    cat > specs/02-decision-register.md <<'EOF'
+# Locked Decision Register
+
+## 1. Data
+
+No locked decision on this surface.
+
+## 2. Security
+
+- A notebook is private to its keeper (`01` §2). [Q-001]
+
+## 6. Change control
+
+A proposed change requires an ADR. [D-001]
+EOF
+
+    cat > specs/03-implementation-plan.md <<'EOF'
+# Implementation Plan
+
+## 3. Phase 0 — Foundations
+
+### Work packages
+
+`PKG-01` Keeper access
+
+- Enforce the ownership rule of `01` §2 in one place.
+- Surfaces: security
+- Touches red line: yes
+- Contract change: no
+
+`PKG-02` Totals
+
+- Derive the monthly total as `01` §1 describes.
+- Surfaces: —
+- Touches red line: no
+- Contract change: yes
+
+`PKG-03` Keeper access on one line — `01` §2.
+
+- Surfaces: security
+- Touches red line: yes
+- Contract change: no
+EOF
+
+    cat > AGENTS.md <<'EOF'
+# AGENTS.md — Fixture
+
+## Non-negotiable constraints
+
+- **One keeper per notebook.** A notebook is readable by its keeper only (`01` §2).
+
+## Prompt selection
+
+The mechanical gates are the floor for every task.
+
+| Prompt | Run when |
+| --- | --- |
+| 1 — Implement | Always. |
+| 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
+| 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness. |
+
+## Living documents
+
+Nothing here.
+EOF
+
+    cat > QUESTIONS.md <<'EOF'
+# QUESTIONS
+
+## Index
+
+- Q-001 — Notebook sharing — security — Resolved
+- Q-002 — Entry retention — data — Open
+
+## Blocking
+
+None. Phase 0 can proceed.
+
+## Open
+
+### Q-002 — Entry retention
+- Surface: data
+- Source: absent from the inputs
+- Question: Are entries ever deleted?
+- Options:
+  - A) Never → effect on data: unbounded growth.
+  - B) Purge after N years → effect on data: a retention period.
+- Recommendation: A, because the input is silent.
+- Blocks: PKG-02
+
+## Resolved
+
+### Q-001 — Notebook sharing
+- Surface: security
+- Source: the fixture
+- Question: Is a notebook ever readable by anyone but its keeper?
+- Options:
+  - A) No → effect on security: one principal.
+  - B) Read-only sharing → effect on security: a grant table.
+- Recommendation: A, because the input says so.
+- Blocks: specification
+- Answer: A (2026-09-14; recommendation accepted)
+EOF
+}
+
+printf 'task-policy acceptance\n'
+
+# --- 1 and 2: the derived values the fixture states are the ones it derives ----
+
+fixture
+if rule > "$work/1.out" 2>&1; then
+    report ok "1+2 a package citing a security-surfaced section states \`Surfaces: security\`, one citing none states the dash, and the rule passes" ""
+    report ok "2b a package written as a single line, citing on its title line, derives from that line" ""
+else
+    report no "1+2 baseline" "$(cat "$work/1.out")"
+fi
+
+# --- 3: a stored Surfaces that disagrees with the cited sections ---------------
+
+sed -i 's/^- Surfaces: security$/- Surfaces: data/' specs/03-implementation-plan.md
+if rule > "$work/3.out" 2>&1; then
+    report no "3 hand-edited Surfaces" "no failure reported"
+elif grep -q 'FAIL task-policy' "$work/3.out" && grep -q 'PKG-01 states `Surfaces: data`' "$work/3.out" \
+     && grep -q 'derives `security`' "$work/3.out"; then
+    report ok "3 a hand-edited \`Surfaces\` fails, naming the package, both values and the sections it cites" ""
+else
+    report no "3 Surfaces drift" "$(cat "$work/3.out")"
+fi
+
+# --- 4: a red line moves onto a package that says it touches none --------------
+
+fixture
+sed -i 's|^- \*\*One keeper per notebook.*$|&\n- **Totals are derived.** A total is computed at read time (`01` §1).|' AGENTS.md
+if rule > "$work/4.out" 2>&1; then
+    report no "4 red line over PKG-02" "no failure reported"
+elif grep -q 'PKG-02 states `Touches red line: no`' "$work/4.out" && grep -q 'a red line cites' "$work/4.out"; then
+    report ok "4 a red line that cites a section a package cites fails that package's \`Touches red line: no\`" ""
+else
+    report no "4 red line" "$(cat "$work/4.out")"
+fi
+
+# --- 5: the table may name only the three real prompts and real characteristics --
+
+fixture
+python3 - <<'PYEOF'
+import io
+t = io.open("AGENTS.md", encoding="utf-8").read()
+t = t.replace("\n## Living documents", "| 4 — Deploy | Whenever it feels right. |\n\n## Living documents")
+io.open("AGENTS.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/5a.out" 2>&1; then
+    report no "5a a fourth prompt" "no failure reported"
+elif grep -q 'names prompt 4, which does not exist' "$work/5a.out"; then
+    report ok "5a a table row for a prompt that does not exist fails" ""
+else
+    report no "5a fourth prompt" "$(cat "$work/5a.out")"
+fi
+
+fixture
+sed -i 's/or `Touches red line` is `yes`/or `Touches redline` is `yes`/' AGENTS.md
+if rule > "$work/5b.out" 2>&1; then
+    report no "5b a typo in a characteristic name" "no failure reported"
+elif grep -q 'reads `Touches redline`, which is not a task characteristic' "$work/5b.out"; then
+    report ok "5b a renamed or mistyped characteristic in the table fails, quoting the token" ""
+else
+    report no "5b characteristic typo" "$(cat "$work/5b.out")"
+fi
+
+fixture
+sed -i 's/^| 2 — Review |/| 2 — Correctness |/' AGENTS.md
+if rule > "$work/5c.out" 2>&1; then
+    report no "5c a renamed prompt" "no failure reported"
+elif grep -q "prompt 2 is 'Correctness'" "$work/5c.out"; then
+    report ok "5c a prompt renamed in the table but not in the sample fails" ""
+else
+    report no "5c prompt rename" "$(cat "$work/5c.out")"
+fi
+
+fixture
+python3 - <<'PYEOF'
+import io
+t = io.open("AGENTS.md", encoding="utf-8").read()
+t = t.replace("| 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |\n", "")
+io.open("AGENTS.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/5d.out" 2>&1; then
+    report no "5d a missing row" "no failure reported"
+elif grep -q 'no row for prompt 3' "$work/5d.out"; then
+    report ok "5d a prompt with no row in the table fails" ""
+else
+    report no "5d missing row" "$(cat "$work/5d.out")"
+fi
+
+# --- 6: blocked-by is live, and reading it writes nothing -----------------------
+
+fixture
+cp specs/03-implementation-plan.md "$work/plan.before"
+out="$(python3 scripts/check-docs.py --task PKG-02 2>&1)"
+if printf '%s' "$out" | grep -q 'blocked-by: Q-002'; then
+    report ok "6 --task names the open card whose Blocks: is the package" ""
+else
+    report no "6 blocked-by" "$out"
+fi
+# resolve Q-002 the way the log would: it moves to Resolved, nothing else changes
+python3 - <<'PYEOF'
+import io, re
+t = io.open("QUESTIONS.md", encoding="utf-8").read()
+card = t[t.index("### Q-002"):t.index("## Resolved")].rstrip() + "\n- Answer: A (2026-09-14)\n"
+t = t.replace(card.split("- Answer:")[0], "")            # out of Open
+t = t.replace("## Open\n\n\n", "## Open\n\nNone.\n\n")
+t = t.replace("## Resolved\n", "## Resolved\n\n" + card)
+t = t.replace("— data — Open", "— data — Resolved")
+io.open("QUESTIONS.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+out="$(python3 scripts/check-docs.py --task PKG-02 2>&1)"
+if printf '%s' "$out" | grep -q 'blocked-by: —'; then
+    report ok "6b once the card is Resolved the same command returns none" ""
+else
+    report no "6b blocked-by after resolution" "$out"
+fi
+if cmp -s "$work/plan.before" specs/03-implementation-plan.md; then
+    report ok "6c neither reading changed the implementation plan: blocked-by is never stored" ""
+else
+    report no "6c plan unchanged" "the plan was rewritten by a --task run"
+fi
+
+# --- 7: the fields have to be there, and boolean ------------------------------
+
+fixture
+sed -i '/^- Touches red line: yes$/d' specs/03-implementation-plan.md
+if rule > "$work/7.out" 2>&1; then
+    report no "7 a missing field" "no failure reported"
+elif grep -q 'PKG-01 states no `Touches red line:`' "$work/7.out"; then
+    report ok "7 a package missing a characteristic fails, naming package and field" ""
+else
+    report no "7 missing field" "$(cat "$work/7.out")"
+fi
+
+fixture
+sed -i 's/^- Contract change: yes$/- Contract change: maybe/' specs/03-implementation-plan.md
+if rule > "$work/8.out" 2>&1; then
+    report no "8 a non-boolean judgement" "no failure reported"
+elif grep -q 'PKG-02 has `Contract change: maybe`' "$work/8.out"; then
+    report ok "8 \`Contract change\` is checked for shape: a value that is not yes or no fails" ""
+else
+    report no "8 contract change shape" "$(cat "$work/8.out")"
+fi
+
+# the judgement itself is never recomputed: both values pass on the same package
+fixture
+sed -i 's/^- Contract change: no$/- Contract change: yes/' specs/03-implementation-plan.md
+if rule > "$work/9.out" 2>&1; then
+    report ok "9 the recorded judgement is not recomputed: either boolean passes on the same package" ""
+else
+    report no "9 contract change not recomputed" "$(cat "$work/9.out")"
+fi
+
+# --- 10: an unknown surface value ----------------------------------------------
+
+fixture
+sed -i 's/^- Surfaces: security$/- Surfaces: security, perf/' specs/03-implementation-plan.md
+if rule > "$work/10.out" 2>&1; then
+    report no "10 an unknown surface" "no failure reported"
+elif grep -q 'perf is not a surface' "$work/10.out"; then
+    report ok "10 a surface outside the five fails, naming it" ""
+else
+    report no "10 unknown surface" "$(cat "$work/10.out")"
+fi
+
+printf '\n%d passed, %d failed\n' "$pass" "$fail"
+[ "$fail" -eq 0 ] || exit 1

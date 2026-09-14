@@ -110,7 +110,22 @@ Mechanical pass after every round:
 1. Implementation plan from its template. Phase 0 as the template fixes it (FND-01 is the
    command contract; FND-03 and FND-04 only when there is an API or a UI). Domain phases in
    dependency order, each with Goal, packages with stable IDs and outcome bullets, and Exit
-   criteria a command or test demonstrates. For every Open card whose `Blocks:` still names a
+   criteria a command or test demonstrates.
+   Then give every package its three characteristics, the data the loop's prompt-selection table
+   runs on (`templates/AGENTS.md` §Prompt selection):
+   - `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --task all`
+     prints, per package, the derived `Surfaces` and `Touches red line`. Copy both onto the
+     package verbatim, one line each. They are derived from the sections the package cites, so
+     they are never judged and never written from memory; `AGENTS.md` does not exist yet, so
+     `Touches red line` reads `no` for every package and Stage C recomputes it once the red lines
+     are compiled.
+   - Set `Contract change:` per package yourself: `yes` when the package defines or modifies an
+     interface, API or schema contract, else `no`. This one is an implementation judgement, not a
+     surface question, so it is recorded rather than asked: append one `decision-added` event
+     (type `implementation`) naming the packages that are `yes` and why, with the packages weighed
+     and rejected as its alternatives, and rebuild the projection.
+   - Re-run `--task all` and check each line against the package; `check-docs`'s `task-policy`
+     rule fails the build on any disagreement, so a value copied wrong does not survive Stage C. For every Open card whose `Blocks:` still names a
    `Phase N` — a card the owner deferred in Stage A, before packages existed — append a
    `card-deferred` event carrying the package ID that the answer changes, and rebuild: this
    refines the target of the owner's deferral, it does not defer anything, and the card's

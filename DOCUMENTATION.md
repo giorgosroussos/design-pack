@@ -41,6 +41,16 @@ Three document layers with one rule between them: `specs/` is the frozen contrac
 is the operating layer that compiles it, and the root documents are the living state. Nothing is
 repeated between them; they cite each other.
 
+The same separation decides which of the three session prompts a task gets. The plan states DATA:
+every work package carries `Surfaces`, `Touches red line` and `Contract change`, the first two
+derived from the sections it cites and verified by `check-docs`, the third the plan author's
+recorded judgement. `AGENTS.md` states POLICY: one table mapping those characteristics to the
+prompts to run. So the contract never says "run a review here", it says "this package touches
+security", and the table — in the free tier, tunable without unlocking `specs/` — says what that
+implies. The fourth characteristic, `blocked-by`, is never stored: it is read from `QUESTIONS.md`
+when the task starts, so resolving a blocking card needs no ceremonial unlock of a hard-locked
+plan.
+
 ---
 
 ## 2. The three layers of the design
@@ -442,6 +452,7 @@ standard library, and it runs before any code exists.
 | `commands` | every command listed in `AGENTS.md` is a real Makefile target |
 | `agents-size` | `AGENTS.md` stays under 20 KB |
 | `markers` | no unrendered placeholder and no `TBD` survives |
+| `task-policy` | every work package states `Surfaces`, `Touches red line` and `Contract change`; the two derived ones equal what the pack derives from its own cards, register and red lines; the prompt-selection table in `AGENTS.md` names only the three real prompts and only characteristics the rule defines |
 
 Targets that are real from the first commit: `check-docs`, `check-locks`, `verify-chain`,
 `rebuild-decisions`, `rebuild-questions`, `install-hooks`, `unlock`. Every other target in the
@@ -453,6 +464,12 @@ targets: that would repair a drifted projection instead of failing on it. `check
 RULE,RULE` scopes a run to the rules that can hold before every document exists (the stages use it
 before Stage C); its summary says how many failures of other rules it dropped, so a scoped run
 never reads as a clean one.
+
+`scripts/check-docs.py --task PACKAGE|all` is the same script read rather than run as a gate. It
+prints, per work package, the two derived characteristics, the recorded `Contract change` and the
+live `blocked-by`. Stage B and Stage C use it to write the stored fields; an implementation
+orchestrator uses it to decide which session prompts a task needs, without a judgement pass of its
+own.
 
 `scripts/extract-normative.py` lists every normative statement with its file, section, line and
 tag. It runs after every writing round and its output is the hunter's input.
@@ -510,13 +527,14 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
-| `test-lock-guard.sh` | 22 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, plus twenty-one policy unit cases over crafted diffs and manifests |
+| `test-lock-guard.sh` | 24 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, two ceremonies in one commit with both paths authorized and both re-locked, plus twenty-four policy unit cases over crafted diffs and manifests, among them a new binary file under a locked glob |
 | `test-decisions-log.sh` | 17 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 34 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
 | `test-check-docs.sh` | 18 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
+| `test-task-policy.sh` | 15 | the `task-policy` rule and the `--task` reader over a fixture pack: a package citing a security-surfaced section, one citing none, a hand-edited `Surfaces`, a red line moving onto a package that denies it, four ways the policy table can lie, the field shapes, a package written as a single line whose citations sit on that line, and `blocked-by` answering live while the plan file stays byte-identical |
 | `test-stage-detect.sh` | 11 | a target walked through every state — empty, inputs saved, cards Blocking, answered, deferred, spec map, files, `AGENTS.md`, baseline — with the verdict asserted at each, including a Blocking card raised during Stage B |
 | `test-allowed-tools.sh` | 2 | every backticked shell command in `stages/*.md` and `SKILL.md`, split into subcommands the way Claude Code matches them, is pre-approved by an `allowed-tools` pattern |
-| `test-render.sh` | 21 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, and one broken red line failing the gate |
+| `test-render.sh` | 22 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, one broken red line failing the gate, and one hand-edited task characteristic failing it |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession

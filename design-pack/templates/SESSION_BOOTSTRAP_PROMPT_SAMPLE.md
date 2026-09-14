@@ -13,6 +13,10 @@ Near-verbatim. Placeholders:
 
 Copy one of the prompts below into a fresh agent session. Adjust the bracketed parts only when needed. The default prompt works for most implementation sessions because `PLAN.md` already carries the task ID, spec references and acceptance criteria.
 
+## Which of the three a task needs
+
+Prompt 1 runs for every task; prompts 2 and 3 are conditional, and the condition is not a judgement. Before starting the `Now` package, read its `Surfaces`, `Touches red line` and `Contract change` in `specs/{{NN_PLAN}}-implementation-plan.md`, and compute `blocked-by`: the cards in `QUESTIONS.md` under Blocking or Open whose `Blocks:` names the package. `python3 scripts/check-docs.py --task <TASK-ID>` prints all four in one line. Then apply the table in `AGENTS.md` "Prompt selection" and run only what it selects, in the order 3, 1, 2. Nothing is written back: the stored three are verified by `make check-docs`, and `blocked-by` is live, so a card resolved this morning changes the answer this afternoon without an edit to the plan.
+
 ## 1. Default: implement the current `Now` item
 
 ```text
@@ -90,3 +94,4 @@ Run make check-docs before finishing.
 - Keep prompts short. The living documents carry the detail; the prompt only points at them.
 - When a session ends early, ask the agent to leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful before stopping, so the next prompt 1 picks up cleanly.
 - Replace `[TASK-ID]` with the package ID from `specs/{{NN_PLAN}}-implementation-plan.md` (for example FND-01).
+- Running every prompt on every task is not the safe default: it spends a session on passes whose dimension the package does not have. The table is the policy, and it lives in `AGENTS.md` so it can be tuned without unlocking the specs.

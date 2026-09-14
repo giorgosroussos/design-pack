@@ -9,6 +9,12 @@ is checked and removed from the prose.
 
 Run from the repository root:  python3 scripts/check-docs.py [--root DIR] [--quiet] [--only RULE,RULE]
 
+`--task PACKAGE|all` prints one line per work package instead of running the
+rules: the two derived characteristics, the recorded `Contract change`, and the
+live `blocked-by`. It is what writes the stored fields when the plan is
+compiled, and what an orchestrator reads before a task to apply the
+prompt-selection table in AGENTS.md.
+
 `--only` keeps the FAIL lines of the named rules and drops the rest, for the
 passes a stage runs before every document exists (Stage A's exit, Stage B's
 rounds); the summary says how many failures were dropped, so a scoped run
@@ -63,6 +69,18 @@ Rules
   agents-size   AGENTS.md stays under its byte ceiling
   markers       no unrendered `{{...}}` placeholder or `TBD` remains in the
                 documents or in the root Makefile
+  task-policy   every work package states `Surfaces:`, `Touches red line:` and
+                `Contract change:`; the two derived ones equal what the pack
+                itself says (the surfaces of the cards and register bullets the
+                package's cited sections resolve to, and whether a red line
+                cites a section the package cites); and the prompt-selection
+                table in AGENTS.md names only the three real prompts and only
+                characteristics this rule defines, so a renamed characteristic
+                or a typo in the table fails the build rather than silently
+                selecting nothing. `Contract change` is a judgement the plan
+                author records, so it is checked for presence and shape only:
+                the rule never recomputes it. `blocked-by` is never stored,
+                because resolving a card would otherwise mean unlocking the plan
 
 The report at the end (cards per surface, `[inferred]` statements per file,
 statements that cite a card still Open, open gaps) is informational; only FAIL
@@ -88,6 +106,14 @@ SURFACES = {"data", "security", "scope", "external", "ux"}
 STATUSES = {"not started", "in progress", "done"}
 DECISION_TYPES = {"implementation", "spec-amendment", "adr"}
 CARD_FIELDS = ["Surface", "Source", "Question", "Options", "Recommendation", "Blocks"]
+SURFACE_ORDER = ["data", "security", "scope", "external", "ux"]
+TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change"]
+DERIVED_FIELDS = ["Surfaces", "Touches red line"]
+BOOLEAN_FIELDS = ["Touches red line", "Contract change"]
+LIVE_CHARACTERISTIC = "blocked-by"
+POLICY_HEADING = "Prompt selection"
+PROMPT_NAMES = {"1": "Implement", "2": "Review", "3": "Resolve questions"}
+EMPTY = "\u2014"
 DECISION_FIELDS = ["Type", "Decision", "Why", "Alternatives", "Affected specs"]
 
 WP_RE = re.compile(r"\b([A-Z]{2,5}-\d{2,3})\b")
@@ -765,6 +791,324 @@ def check_agents(root):
         ok("commands", "%d listed targets exist" % len(listed & targets))
 
 
+
+# --- task characteristics and the prompt-selection policy ---------------------
+#
+# The pack states DATA (what kind of task a package is); AGENTS.md states POLICY
+# (when that kind needs a review or a question pass). The two are kept apart on
+# purpose, exactly as provenance is: the plan never says "run a review here", it
+# says "this package touches security", and the table says what that implies.
+# Three characteristics are stored on the package and two of those are DERIVED
+# from what the pack already holds, so they cannot drift when a decision changes
+# and this rule can recompute them. The fourth, `blocked-by`, is never stored:
+# it is read from QUESTIONS.md at run time, so resolving a blocking card needs no
+# ceremonial unlock of a hard-locked plan.
+
+
+def line_citations(line):
+    """Every `NN` §M citation on one line, as (NN, section) pairs.
+
+    The same tokens the `citations` rule resolves, without the resolving: what a
+    package cites is read here, so the two can never disagree about what a
+    citation is.
+    """
+    out = []
+    for m in FILE_TOKEN_RE.finditer(line):
+        if not m.group(1):
+            continue
+        for sec in expand_sections(line[m.end():]):
+            out.append((m.group(1), sec))
+    return out
+
+
+def text_citations(text):
+    out = []
+    for line in text.splitlines():
+        out.extend(line_citations(line))
+    return out
+
+
+def with_parents(citations):
+    """Each citation and its top-level section, so a §2 and a §2.1 still meet."""
+    out = set()
+    for nn, sec in citations:
+        out.add((nn, sec))
+        out.add((nn, sec.split(".")[0]))
+    return out
+
+
+def plan_package_blocks(root):
+    """[(package, line, block)] for the implementation plan, in file order.
+
+    A package's block runs from its `` `PKG-NN` Title `` line to the next one or
+    to the next heading, whichever comes first. The title line is part of the
+    block: a plan that writes a package as one line carries its citations there
+    and nowhere else, and a derivation that skipped it would read that package as
+    touching no surface at all.
+    """
+    plan = spec_by_role(root, "implementation-plan")
+    if not plan:
+        return []
+    blocks, current = [], None
+    for ln, line in enumerate(strip_fences(read(plan)).splitlines(), 1):
+        m = re.match(r"^`([A-Z]{2,5}-\d{2,3})`\s", line)
+        if m:
+            current = [m.group(1), ln, [line]]
+            blocks.append(current)
+            continue
+        if line.startswith("#"):
+            current = None
+            continue
+        if current is not None:
+            current[2].append(line)
+    return [(pkg, ln, "\n".join(body)) for pkg, ln, body in blocks]
+
+
+def surface_named(heading):
+    """The surface a register heading groups, or None (`6. Change control`)."""
+    text = heading.lower()
+    for surface in SURFACE_ORDER:
+        if surface in text:
+            return surface
+    if "identity" in text or "user experience" in text:
+        return "ux"
+    return None
+
+
+def card_surfaces(cards):
+    out = {}
+    for q, (_, _, body) in cards.items():
+        m = re.search(r"^-?\s*\*?\*?Surface:?\*?\*?:?\s*([a-z]+)", body, re.M)
+        if m and m.group(1) in SURFACES:
+            out[q] = m.group(1)
+    return out
+
+
+def section_surfaces(root, cards):
+    """{(NN, section): {surface}}: where each spec section touches a surface.
+
+    Two sources, both already in the pack and both the owner's: a `[Q-NNN]` tag
+    contributes its card's surface to the section it sits in, and a bullet of the
+    locked register contributes the surface of the heading it sits under, to its
+    own section and to every section it cites. A `[D-NNN]` or `[input]` statement
+    contributes nothing by itself: it is not an owner decision on a surface.
+    """
+    surface_of = card_surfaces(cards)
+    index = {}
+
+    def add(key, surface):
+        index.setdefault(key, set()).add(surface)
+
+    register = spec_by_role(root, "decision-register")
+    for path in spec_files(root):
+        nn = os.path.basename(path)[:2]
+        section, heading_surface = "-", None
+        for line in strip_fences(read(path)).splitlines():
+            hm = SPEC_HEADING_RE.match(line)
+            if hm:
+                section = hm.group(2)
+                heading_surface = surface_named(hm.group(3)) if path == register else None
+                continue
+            for q in Q_TAG_RE.findall(line):
+                if q in surface_of:
+                    add((nn, section), surface_of[q])
+                    add((nn, section.split(".")[0]), surface_of[q])
+            if heading_surface and re.match(r"^\s*[-*]\s+\S", line):
+                add((nn, section), heading_surface)
+                for cite in with_parents(line_citations(line)):
+                    add(cite, heading_surface)
+    return index
+
+
+def red_line_sections(root):
+    """Every section a red line of AGENTS.md cites, with parents."""
+    path = os.path.join(root, "AGENTS.md")
+    if not exists(path):
+        return set()
+    red = section_text(strip_fences(read(path)), "Non-negotiable constraints")
+    if red is None:
+        return set()
+    out = set()
+    for line in red.splitlines():
+        if re.match(r"^\s*[-*]\s+\S", line):
+            out |= with_parents(line_citations(line))
+    return out
+
+
+def derive_characteristics(root, cards):
+    """{package: derived characteristics}, from the pack's own data only."""
+    index = section_surfaces(root, cards)
+    red = red_line_sections(root)
+    out = {}
+    for pkg, ln, block in plan_package_blocks(root):
+        cites = with_parents(text_citations(block))
+        surfaces = set()
+        for cite in cites:
+            surfaces |= index.get(cite, set())
+        hits = sorted(cites & red)
+        out[pkg] = {
+            "line": ln,
+            "Surfaces": ", ".join(s for s in SURFACE_ORDER if s in surfaces) or EMPTY,
+            "Touches red line": "yes" if hits else "no",
+            "cites": sorted(cites),
+            "red hits": hits,
+        }
+    return out
+
+
+def stored_characteristics(block):
+    """{field: [values]} as the package block states them."""
+    pattern = re.compile(r"^\s*[-*]\s*\*?\*?(%s)\*?\*?:\s*(.*?)\s*$"
+                         % "|".join(re.escape(f) for f in TASK_FIELDS))
+    found = {}
+    for line in block.splitlines():
+        m = pattern.match(line)
+        if m:
+            found.setdefault(m.group(1), []).append(m.group(2))
+    return found
+
+
+def blocked_by(cards, package):
+    """The open cards whose `Blocks:` names this package.
+
+    Computed here and never written into the plan: a card is resolved by an
+    event, and the plan is hard-locked once the pack is frozen.
+    """
+    out = []
+    for q in sorted(cards):
+        section, _, body = cards[q]
+        if section not in ("Blocking", "Open"):
+            continue
+        m = re.search(r"^-?\s*\*?\*?Blocks\*?\*?:\s*(.+?)\s*$", body, re.M)
+        if m and m.group(1).strip() == package:
+            out.append(q)
+    return out
+
+
+def allowed_policy_token(token):
+    """True when a backticked token in the policy table names something real."""
+    if token in TASK_FIELDS or token == LIVE_CHARACTERISTIC:
+        return True
+    if token.rstrip(":") in [f.rstrip(":") for f in CARD_FIELDS]:
+        return True
+    if token in SURFACES or token in ("yes", "no"):
+        return True
+    if token.endswith(".md") or token.startswith("make "):
+        return True
+    return False
+
+
+def check_policy_table(root):
+    """The prompt-selection table names the three real prompts and nothing else."""
+    path = os.path.join(root, "AGENTS.md")
+    if not exists(path):
+        return                       # `red-lines` already reports the absence
+    table = section_text(strip_fences(read(path)), POLICY_HEADING)
+    if table is None:
+        fail("task-policy", "AGENTS.md", "no `## %s` section; the characteristics in the plan "
+             "select nothing without the table that reads them" % POLICY_HEADING)
+        return
+    seen = {}
+    for line in table.splitlines():
+        m = re.match(r"^\|\s*(\d+)\s*[\u2014-]\s*([^|]+?)\s*\|(.*)\|\s*$", line)
+        if not m:
+            continue
+        number, name, run_when = m.group(1), m.group(2), m.group(3)
+        if number in seen:
+            fail("task-policy", "AGENTS.md", "prompt %s has two rows in the %s table"
+                 % (number, POLICY_HEADING))
+        seen[number] = name
+        if number not in PROMPT_NAMES:
+            fail("task-policy", "AGENTS.md", "the %s table names prompt %s, which does not exist; "
+                 "the prompts are %s" % (POLICY_HEADING, number,
+                                         ", ".join("%s (%s)" % (n, PROMPT_NAMES[n])
+                                                   for n in sorted(PROMPT_NAMES))))
+        elif name != PROMPT_NAMES[number]:
+            fail("task-policy", "AGENTS.md", "prompt %s is %r in the %s table and %r in "
+                 "SESSION_BOOTSTRAP_PROMPT_SAMPLE.md"
+                 % (number, name, POLICY_HEADING, PROMPT_NAMES[number]))
+        for token in re.findall(r"`([^`]+)`", run_when):
+            if not allowed_policy_token(token):
+                fail("task-policy", "AGENTS.md", "the %s table reads `%s`, which is not a task "
+                     "characteristic; they are %s and %s"
+                     % (POLICY_HEADING, token, ", ".join("`%s`" % f for f in TASK_FIELDS),
+                        "`%s`" % LIVE_CHARACTERISTIC))
+    missing = sorted(set(PROMPT_NAMES) - set(seen))
+    if missing:
+        fail("task-policy", "AGENTS.md", "the %s table has no row for prompt %s"
+             % (POLICY_HEADING, ", ".join(missing)))
+
+
+def check_task_policy(root, cards):
+    derived = derive_characteristics(root, cards)
+    plan = spec_by_role(root, "implementation-plan")
+    rel = os.path.relpath(plan, root) if plan else SPECS_DIR
+    packages = plan_package_blocks(root)
+    for pkg, ln, block in packages:
+        where = "%s:%d" % (rel, ln)
+        stored = stored_characteristics(block)
+        for field in TASK_FIELDS:
+            values = stored.get(field, [])
+            if not values:
+                fail("task-policy", where, "%s states no `%s:`; a package without its "
+                     "characteristics cannot be matched against the prompt-selection table "
+                     "in AGENTS.md" % (pkg, field))
+            elif len(values) > 1:
+                fail("task-policy", where, "%s states `%s:` %d times; one line, one value"
+                     % (pkg, field, len(values)))
+        for field in BOOLEAN_FIELDS:
+            value = (stored.get(field) or [None])[0]
+            if value is not None and value not in ("yes", "no"):
+                fail("task-policy", where, "%s has `%s: %s`; the value is `yes` or `no`"
+                     % (pkg, field, value))
+        surfaces = (stored.get("Surfaces") or [None])[0]
+        if surfaces is not None and surfaces != EMPTY:
+            unknown = [s for s in [p.strip() for p in surfaces.split(",")] if s not in SURFACES]
+            if unknown:
+                fail("task-policy", where, "%s has `Surfaces: %s`; %s is not a surface (%s), "
+                     "and an empty set is written `%s`"
+                     % (pkg, surfaces, ", ".join(unknown), ", ".join(SURFACE_ORDER), EMPTY))
+        expected = derived.get(pkg, {})
+        for field in DERIVED_FIELDS:
+            value = (stored.get(field) or [None])[0]
+            if value is None or field not in expected:
+                continue
+            if value != expected[field]:
+                detail = ("the sections it cites are %s"
+                          % (", ".join("`%s` \u00a7%s" % c for c in expected["cites"]) or "none")
+                          if field == "Surfaces" else
+                          "a red line cites %s"
+                          % (", ".join("`%s` \u00a7%s" % c for c in expected["red hits"])
+                             or "none of its sections"))
+                fail("task-policy", where, "%s states `%s: %s`, but the pack derives `%s`: %s. "
+                     "This characteristic is derived, not judged: correct the field, or the "
+                     "citation that no longer holds" % (pkg, field, value, expected[field], detail))
+    ok("task-policy", "%d work package(s) carry their characteristics" % len(packages))
+    check_policy_table(root)
+
+
+def report_tasks(root, cards, selector):
+    """`--task`: the characteristics of one package or of all, derived live."""
+    derived = derive_characteristics(root, cards)
+    packages = [p for p, _, _ in plan_package_blocks(root)]
+    if selector != "all":
+        if selector not in derived:
+            sys.stderr.write("check-docs: %s is not a work package in the implementation plan\n"
+                             % selector)
+            return 2
+        packages = [selector]
+    for pkg, ln, block in plan_package_blocks(root):
+        if pkg not in packages:
+            continue
+        stored = stored_characteristics(block)
+        contract = (stored.get("Contract change") or [EMPTY])[0] or EMPTY
+        cards_blocking = blocked_by(cards, pkg)
+        print("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %s"
+              % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
+                 LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY))
+    return 0
+
+
 # --- event log ---------------------------------------------------------------
 
 def check_log(root):
@@ -829,9 +1173,18 @@ def main():
     ap.add_argument("--quiet", action="store_true", help="print only failures and the summary")
     ap.add_argument("--only", default=None, metavar="RULE,RULE",
                     help="report failures of these rules only (e.g. citations,markers,decisions,cards)")
+    ap.add_argument("--task", default=None, metavar="PACKAGE|all",
+                    help="print the characteristics of a work package (derived) and the cards "
+                         "blocking it (live) instead of running the rules")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
     only = set(r.strip() for r in args.only.split(",")) if args.only else None
+
+    if args.task:
+        # A reader, not a gate: it answers "what kind of task is this" without
+        # judging the pack, so an orchestrator can apply the table in AGENTS.md.
+        cards, _, _ = parse_cards(root)
+        return report_tasks(root, cards, args.task)
 
     docs = [os.path.join(root, d) for d in ROOT_DOCS if exists(os.path.join(root, d))]
     specs = spec_files(root)
@@ -853,6 +1206,7 @@ def main():
     check_inferred(inferred, is_frozen)
     provisional = provisional_citations(root, specs, cards)
     check_agents(root)
+    check_task_policy(root, cards)
     events, chain_ok = check_log(root)
     makefile = os.path.join(root, "Makefile")
     check_markers(root, all_docs + ([makefile] if exists(makefile) else []))
