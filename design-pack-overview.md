@@ -122,6 +122,10 @@ You'll receive the skill as a folder named `design-pack`. You need Claude Code i
    Nothing in either list reaches beyond the skill's scripts, the pack's `make` targets and
    the file operations the pack needs.
 
+   *Optional, recommended:* make the installed skill read-only, `chmod -R a-w ~/.claude/skills/design-pack`.
+   The skill's rules say it never edits itself; the mode bit makes that true even when a session
+   tries. Remove the bit when you upgrade the skill.
+
 2. **Make a working directory and initialise git in it.** The integrity layer only enforces
    anything inside a git repository, so this step matters:
    ```

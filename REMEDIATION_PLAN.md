@@ -603,13 +603,16 @@ Acceptance:
 Right after copying the C1 assets the agent requested an edit to
 `~/.claude/skills/design-pack/templates/scripts/check-docs.py` (refused by the owner as a sensitive
 file). The copied tooling carries no leakage word, so the reason is not the C4.3 grep; it is
-unknown — **owner, if you saw the diff it proposed, paste it**. Fix regardless: `SKILL.md` hard
-rule *Never edit the skill* — a defect in a template or script is a finding in the stop's report,
-never a patch in place.
+not recoverable: the owner ran in manual mode, saw the prompt in sequence (after the C1 copy,
+before the `Makefile` was written) and did not keep the proposed diff. Fix regardless: `SKILL.md`
+hard rule *Never edit the skill* — a defect in a template or script is a finding in the stop's
+report, never a patch in place — and the install notes recommend `chmod -R a-w` on the installed
+skill, so the rule holds even against a session that forgets it. If the request recurs in the
+next run, the owner keeps the diff and it becomes its own item.
 
 Acceptance:
-- [x] the rule is in `SKILL.md`.
-- [ ] the cause, once known, gets its own fix or a "no change needed" note here.
+- [x] the rule is in `SKILL.md`; the install notes carry the read-only recommendation.
+- [x] the cause: not recoverable from this run; watched for in the next (owner).
 
 ### W8.5 — Small things seen in the log
 
@@ -908,3 +911,13 @@ Append-only. One entry per session per item touched. Form:
 - Left open: W8.1 — owner to confirm the offer-at-A0 placement and re-run once with *allow*
   (acceptance: no prompt to Stage C); W8.4 — cause unknown until the owner pastes the diff the
   agent proposed; W8.5 second bullet (name the rule list and payload fields in the stages).
+
+### 2026-09-14 — W8.4 closed; W8.1 awaits the owner's second run
+- Changed: W8.4 recorded as not recoverable (manual mode, prompts seen in order, diff not kept);
+  `design-pack-overview.md` install notes recommend `chmod -R a-w` on the installed skill so
+  *Never edit the skill* holds mechanically. No code change.
+- Proved by: seven suites green, unchanged (125 cases).
+- Left open: W8.1's second run with *allow* at A0 — expected result: no permission prompt to
+  Stage C; if "Do you want to create …" still appears for the pack's files, the grant needs a
+  path-scoped `Write(...)` rule instead of the bare tool name, and that is the one thing the run
+  will settle. W8.5's second bullet stays as a ½-hour item.
