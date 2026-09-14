@@ -48,6 +48,7 @@ bash design-pack/scripts/test-stage-detect.sh
 | W5 | Honest limits: unlock record is an audit trail | docs | ½ hour | done |
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | done |
 | W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | done |
+| W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -540,6 +541,88 @@ stops. Estimate: ½ hour + decision.
 
 ---
 
+## W8 — Findings of the live dry run (owner's session, 2026-09-14)
+
+Status: in progress
+Decision: one item is the owner's (W8.1, marked **owner**); the rest are fixes.
+
+Source: the owner ran `/design-pack .` on the pottery brief in their own permission mode, through
+the Stage C stop (33 cards, 27 decisions, 172 tagged statements, `check-docs` 0 failures, first
+commit made), and pasted every prompt. Ordered by weight.
+
+### W8.1 — The skill's pre-approval lasts one turn (**owner**)
+
+Every Bash command and every file write asked for permission from the second reply on, although
+each matched an `allowed-tools` pattern. Documented cause (code.claude.com/docs/en/skills.md):
+"The grant clears when you send your next message." A skill that stops for the owner many times
+cannot rely on `allowed-tools` at all beyond its first turn. The documented remedy is a standing
+grant in `settings.json` (project or user).
+
+Fix: `templates/claude-settings.local.json` carries the skill's Bash patterns (and Read/Write/Edit/
+Glob/Grep) as `permissions.allow`; Stage A round A0's stop tells the owner this once and offers to
+write it to `<target>/.claude/settings.local.json` on the word *allow* (not committed; C1.2 adds it
+to `.gitignore`); the install notes show the user-level alternative. `test-allowed-tools.sh`
+asserts the template and `allowed-tools` list the same patterns. **Owner**: the offer is made in
+conversation and acted on only on the owner's word — confirm that is the right place for it, or
+choose "install notes only". Recommendation: keep the offer; a first-time user does not know why
+the prompts appear.
+
+Acceptance:
+- [x] `test-allowed-tools.sh` passes with the sync assertion.
+- [ ] a live run after *allow* at A0 reaches Stage C with no permission prompt (owner's next run).
+
+### W8.2 — `find -exec` cannot be pre-approved
+
+Claude Code refuses to auto-allow `find … -exec` under any `Bash(find …)` rule ("executes
+commands"). The W6 fix for the read-only pass used exactly that. Fix: the read-only pass is the
+guard's own `lock-guard.py --relock` (every existing hard-locked file loses its write bits — only
+the write bits, or the hooks would lose their exec bit and git would skip them silently, which is
+what the first version of this fix did and the ceremony tests caught), run by `make install-hooks`
+so a clone gets the modes back; C1.6 and D4.2 call `make install-hooks`; `post-commit` re-locks
+with `a-w` for the same reason; `find *` leaves `allowed-tools`.
+
+Acceptance:
+- [x] `test-lock-guard.sh` case 9: hard-locked files lose their write bits, tracked or not, hooks
+      stay `r-x`, free files untouched; the ceremony cases 4a–4g still pass (hooks still run).
+- [x] `test-render.sh` 5f: after `install-hooks` the manifest refuses an in-session write at the
+      filesystem; the promotion still goes through the ceremony.
+
+### W8.3 — Thirty-three cards, one process each
+
+The agent wrote its own batch scripts (`open-cards.py`, `add-decisions.py`) because `log-append`
+takes one payload per process; those scripts matched no pattern. Fix: `--payload-file` accepts a
+JSON array — every element validated and folded against the projection first, then appended all
+or nothing; A1.5 names the form.
+
+Acceptance:
+- [x] `test-questions-log.sh` 11/11b: a batch with one bad element is refused whole, naming the
+      element, nothing appended; a valid batch appends in order and the chain verifies.
+
+### W8.4 — The agent asked to edit the skill's own `check-docs.py`
+
+Right after copying the C1 assets the agent requested an edit to
+`~/.claude/skills/design-pack/templates/scripts/check-docs.py` (refused by the owner as a sensitive
+file). The copied tooling carries no leakage word, so the reason is not the C4.3 grep; it is
+unknown — **owner, if you saw the diff it proposed, paste it**. Fix regardless: `SKILL.md` hard
+rule *Never edit the skill* — a defect in a template or script is a finding in the stop's report,
+never a patch in place.
+
+Acceptance:
+- [x] the rule is in `SKILL.md`.
+- [ ] the cause, once known, gets its own fix or a "no change needed" note here.
+
+### W8.5 — Small things seen in the log
+
+- The pack's first commit carried the harness's `Co-Authored-By` line although the pack's own
+  `CLAUDE.md` forbids AI attribution. C5's message is the one given; a harness that appends to
+  it is the harness. No change; noted so the next reader does not chase it.
+- The agent reached for `wc -c` and `grep -n` over the skill's scripts to learn field names and
+  rule lists it needed (Answer rendering, `--only` rule names, `decision-added` fields). Those are
+  inspection commands and prompt in any mode; the stage files could name the rule list and the
+  payload fields once each so the agent does not go looking. ½ hour, not done here.
+
+---
+
 ## Not in scope
 
 - Signed unlock records / server-side approval (see W5 — would change the threat model).
@@ -800,3 +883,28 @@ Append-only. One entry per session per item touched. Form:
 - Left open: nothing in W7. Across the plan: only the live `/design-pack` session in the
   owner's permission mode (W6 procedure) remains, and `Feature-Design.md` is the next piece of
   work, outside this plan.
+
+### 2026-09-14 — W8 — in progress (W8.2, W8.3 done; W8.1 and W8.4 await the owner)
+- Changed: **W8.2** `templates/scripts/lock-guard.py --relock` (removes the write bits of every
+  existing hard-locked file; the first version set 0444 and stripped the hooks' exec bit, so git
+  skipped them silently — ten ceremony cases failed at once, which is what they are for), run by
+  `templates/Makefile` `install-hooks`; `templates/githooks/post-commit` re-locks with `a-w` for
+  the same reason; C1.6 and D4.2 call `make install-hooks`; `find *` out of `allowed-tools`.
+  **W8.3** `templates/scripts/log-append.py` accepts a JSON array in `--payload-file`: every
+  element validated and folded first, appended all or nothing; A1.5 names the form. **W8.1**
+  `templates/claude-settings.local.json` (the same 20 Bash patterns plus Read/Write/Edit/Glob/Grep
+  as `permissions.allow`); A0's stop explains the one-turn grant and offers it on the owner's word;
+  C1.2 ignores `.claude/settings.local.json`; `SKILL.md` frontmatter comment and files table;
+  `design-pack-overview.md` install note. **W8.4** `SKILL.md` hard rule *Never edit the skill*.
+  Tests: `test-lock-guard.sh` +1 (relock semantics) and `chmod u+w` before every deliberate
+  illegitimate write, since the files are now read-only after `install-hooks`; `test-render.sh`
+  +5f (the manifest refuses an in-session write at the filesystem); `test-questions-log.sh`
+  +11/11b (batch refused whole naming the element; valid batch appends in order);
+  `test-allowed-tools.sh` +1 (settings template and `allowed-tools` carry the same patterns).
+- Proved by: seven suites green — 22 + 17 + 34 + 18 + 21 + 2 + 11 = 125 cases. The one-turn
+  grant is documented ("The grant clears when you send your next message", skills.md) and matches
+  the log: every command prompted from the second reply on. `find -exec` refusal quoted verbatim
+  from the owner's log.
+- Left open: W8.1 — owner to confirm the offer-at-A0 placement and re-run once with *allow*
+  (acceptance: no prompt to Stage C); W8.4 — cause unknown until the owner pastes the diff the
+  agent proposed; W8.5 second bullet (name the rule list and payload fields in the stages).

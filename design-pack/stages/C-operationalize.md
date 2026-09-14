@@ -41,10 +41,12 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
    `templates/scripts/unlock.sh` to `<target>/scripts/`; `templates/.doc-locks` to the target
    root; `templates/githooks/pre-commit`, `post-commit`, `pre-receive` and `README.md` to
    `<target>/.githooks/`. `chmod +x` the two scripts and the three hooks. Render
-   `templates/UNLOCKS.md` (no placeholders; strip the notes block). Add `.doc-unlock` and
-   `__pycache__/` to `<target>/.gitignore`, creating that file if it does not exist: the unlock
-   token is local and single-use and is never committed, and `check-docs.py` imports
-   `eventlog.py`, so Python writes bytecode beside the scripts on the first run.
+   `templates/UNLOCKS.md` (no placeholders; strip the notes block). Add `.doc-unlock`,
+   `__pycache__/` and `.claude/settings.local.json` to `<target>/.gitignore`, creating that file
+   if it does not exist: the unlock token is local and single-use and is never committed,
+   `check-docs.py` imports `eventlog.py`, so Python writes bytecode beside the scripts on the
+   first run, and the owner's local permission grant (Stage A round A0) is theirs, not the
+   pack's.
 3. Copy the log tooling, all unchanged: `templates/scripts/eventlog.py`, `log-append.py`,
    `rebuild-decisions.py`, `rebuild-questions.py` and `verify-chain.py` to `<target>/scripts/`;
    `chmod +x` the four tools. `eventlog.py` is a module rather than a tool: the three tools and `check-docs.py`
@@ -57,11 +59,12 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
 5. Render `CLAUDE.md`, `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` and `README.md` from their
    templates. Placeholders only; no new rules.
 6. Activate the layer, when the target is a git repository:
-   `cd <target> && make install-hooks` (which is `git config core.hooksPath .githooks` plus the
-   exec bits), then make the hard-locked files read-only:
-   `find <target>/docs/inputs -type f -exec chmod 0444 {} +`. An accidental in-session overwrite
-   then fails at the filesystem before it ever reaches a commit. (Every file, not only tracked
-   ones: nothing is tracked yet, because no stage commits; the owner makes the first commit.) Git records only the exec bit,
+   `cd <target> && make install-hooks`, which is `git config core.hooksPath .githooks`, the exec
+   bits, and `scripts/lock-guard.py --relock`: every existing file the manifest calls
+   hard-locked (`docs/inputs/**`, the guard, the hooks, the manifest) loses its write bits (the
+   hooks keep their exec bit). An
+   accidental in-session overwrite then fails at the filesystem before it ever reaches a commit.
+   Git records only the exec bit,
    so the mode is local to the clone and `make install-hooks` runs again after every clone; the
    hooks, not the mode bits, are the enforcement. If the target is not a git repository, say so in
    the report and leave the hooks uninstalled rather than initializing one. Never `chmod`

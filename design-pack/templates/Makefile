@@ -91,9 +91,10 @@ check-docs: verify-chain ## Mechanical consistency of the documentation layer
 check-locks: ## Lock manifest check of the staged change (what the pre-commit hook runs)
 	python3 scripts/lock-guard.py --staged
 
-install-hooks: ## Point git at the versioned hooks in .githooks/ (once per clone)
+install-hooks: ## Point git at the versioned hooks in .githooks/ and re-apply read-only modes (once per clone)
 	git config core.hooksPath .githooks
 	chmod +x .githooks/pre-commit .githooks/post-commit .githooks/pre-receive
+	python3 scripts/lock-guard.py --relock
 	@echo "hooks active from $$(git config core.hooksPath). The remote needs .githooks/pre-receive installed separately; see .githooks/README.md."
 
 unlock: ## Ceremonial unlock of one hard-locked path: make unlock PATH=<path> REASON="why"

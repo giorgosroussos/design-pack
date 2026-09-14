@@ -4,6 +4,11 @@ description: Generate the design documentation pack that an implementation agent
 argument-hint: "[target-dir]"
 disable-model-invocation: true
 allowed-tools:
+  # This pre-approval lasts ONE turn: Claude Code clears it when the owner sends the next
+  # message, and this skill stops for the owner many times. Stage A round A0 therefore offers
+  # the owner the same patterns for the session (templates/claude-settings.local.json, or the
+  # user's own settings; see the install notes). scripts/test-allowed-tools.sh keeps the two
+  # listings identical.
   - Read
   - Write
   - Edit
@@ -32,7 +37,6 @@ allowed-tools:
   - Bash(git config core.hooksPath*)
   - Bash(git add *)
   - Bash(git commit *)
-  - Bash(find *)
   - Bash(grep *)
 ---
 
@@ -142,6 +146,10 @@ unacceptable state.
   every `TEMPLATE NOTES` block when rendering and run the leakage greps of
   `stages/C-operationalize.md` Step C4 before every stop.
 - **Never add scope.** A missing requirement whose absence matters is a card.
+- **Never edit the skill.** Nothing under `${CLAUDE_SKILL_DIR}` is written, edited or patched
+  during a run, whatever a check reports: a defect in a template or a script is a finding for
+  the stop's report, quoted with file and line, and the run continues with the skill as it is.
+  The target gets copies; the skill stays the reference.
 - **Copy mechanisms, not domain.** Templates carry the exemplar's mechanisms; the exemplar's
   tenancy model, entities and screens never leak into another product's pack.
 
@@ -163,6 +171,7 @@ unacceptable state.
 | `templates/scripts/log-append.py`, `verify-chain.py` | the only sanctioned writer, and the chain check |
 | `templates/scripts/rebuild-decisions.py`, `rebuild-questions.py` | the two projections, both thin over the shared renderer |
 | `templates/decisions-seed.json` | the five regime records Stage B appends to a fresh log |
+| `templates/claude-settings.local.json` | the skill's command patterns as a session-long permission grant, offered to the owner at the intake stop |
 | `templates/log-README.md` | the log's own README: canonical form, and what the chain does not guarantee |
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |

@@ -17,6 +17,7 @@ Usage, from the repository root:
     python3 scripts/lock-guard.py --staged          # what .githooks/pre-commit runs
     git diff OLD NEW | python3 scripts/lock-guard.py --manifest OLD.doc-locks --new-manifest NEW.doc-locks
     python3 scripts/lock-guard.py --tier specs/README.md
+    python3 scripts/lock-guard.py --relock          # remove the write bits of every hard-locked file
 
 Manifest (`.doc-locks`), one rule per line, `tier: glob`:
 
@@ -389,6 +390,28 @@ def check(diff_text, rules, token_paths=(), log_path=DEFAULT_LOG,
     return violations
 
 
+def relock(root, rules):
+    """Remove the write bits of every existing file the manifest calls hard-locked;
+    returns the count.
+
+    Only the write bits: the hooks are hard-locked too and must stay executable,
+    or git would skip them silently. Git records only the exec bit, so the mode is
+    local to a clone and has to be re-applied after cloning or after a promotion;
+    the hooks, not the modes, are the enforcement. Directories are left writable
+    so new files can still be added deliberately.
+    """
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        for name in filenames:
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, root).replace(os.sep, "/")
+            if tier_of(rel, rules)[0] == "hard-locked":
+                os.chmod(full, os.stat(full).st_mode & ~0o222)
+                count += 1
+    return count
+
+
 # --- transport ---------------------------------------------------------------
 
 def staged_diff(root):
@@ -431,6 +454,9 @@ def main():
                     help="ignore any local token; a server-side hook never sees one")
     ap.add_argument("--log", default=DEFAULT_LOG, help="unlock log path inside the repository")
     ap.add_argument("--tier", metavar="PATH", help="print the tier of one path and exit")
+    ap.add_argument("--relock", action="store_true",
+                    help="remove the write bits of every existing hard-locked file and exit; "
+                         "`make install-hooks` runs this, so a clone gets the mode bits back")
     ap.add_argument("--quiet", action="store_true", help="print only violations")
     args = ap.parse_args()
 
@@ -480,6 +506,12 @@ def main():
         probe = args.tier[2:] if args.tier.startswith("./") else args.tier
         tier, glob = tier_of(probe, rules)
         print("%s\t%s" % (tier, glob or "(no rule; free by default)"))
+        return 0
+
+    if args.relock:
+        n = relock(root, rules)
+        if not args.quiet:
+            print("lock-guard: %d hard-locked file(s) set read-only" % n)
         return 0
 
     diff_text = staged_diff(root) if args.staged else sys.stdin.read()

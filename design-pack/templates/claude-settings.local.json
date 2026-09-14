@@ -1,0 +1,32 @@
+{
+  "_comment": "Offered to the owner at the Stage A intake stop and written to <target>/.claude/settings.local.json only on the owner's word. A skill's own allowed-tools pre-approval lasts one turn and this skill stops for the owner many times; these rules are the same patterns, made to last for the session. Local settings are not committed (.gitignore). {{SKILL_DIR}} is the skill's directory, substituted when rendered.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(bash {{SKILL_DIR}}/scripts/*)",
+      "Bash(python3 {{SKILL_DIR}}/scripts/*)",
+      "Bash(python3 {{SKILL_DIR}}/templates/scripts/*)",
+      "Bash(python3 scripts/*)",
+      "Bash(make check-docs)",
+      "Bash(make check-locks)",
+      "Bash(make verify-chain)",
+      "Bash(make rebuild-decisions)",
+      "Bash(make rebuild-questions)",
+      "Bash(make install-hooks)",
+      "Bash(make unlock *)",
+      "Bash(cd *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(chmod *)",
+      "Bash(git config core.hooksPath*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(grep *)"
+    ]
+  }
+}

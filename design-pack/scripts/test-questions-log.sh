@@ -468,5 +468,33 @@ else
     report ok "10c stage-detect never names the log; it reads QUESTIONS.md" ""
 fi
 
+# --- 11. a JSON array appends a batch, all or nothing -----------------------------
+
+before="$(wc -l < .log/events.jsonl)"
+cat > "$work/batch-bad.json" <<'EOF'
+[{"id":"Q-006","title":"Six","surface":"data","source":"s","question":"q?",
+  "options":["A) x → effect on data: a.","B) y → effect on data: b."],"recommendation":"A, because.","blocks":"specification"},
+ {"id":"Q-008","title":"Eight, skipping seven","surface":"data","source":"s","question":"q?",
+  "options":["A) x → effect on data: a.","B) y → effect on data: b."],"recommendation":"A, because.","blocks":"specification"}]
+EOF
+if python3 scripts/log-append.py --quiet --stream questions --type card-opened --payload-file "$work/batch-bad.json" > "$work/b1.out" 2>&1; then
+    report no "11 a batch with a bad element" "it was appended"
+elif grep -q 'element 1' "$work/b1.out" && [ "$(wc -l < .log/events.jsonl)" = "$before" ]; then
+    report ok "11 a batch with one bad element is refused whole, naming the element; nothing appended" ""
+else
+    report no "11 batch refusal" "$(cat "$work/b1.out"); lines $before -> $(wc -l < .log/events.jsonl)"
+fi
+sed -i 's/Q-008/Q-007/; s/Eight, skipping seven/Seven/' "$work/batch-bad.json"
+if python3 scripts/log-append.py --quiet --stream questions --type card-opened --payload-file "$work/batch-bad.json" && [ "$(wc -l < .log/events.jsonl)" = "$((before + 2))" ]; then
+    rebuild
+    if grep -q '^### Q-006 — Six' QUESTIONS.md && grep -q '^### Q-007 — Seven' QUESTIONS.md && python3 scripts/verify-chain.py --quiet; then
+        report ok "11b a valid batch appends every element in order and the chain verifies" ""
+    else
+        report no "11b batch rendering" "$(grep -c '^### Q-' QUESTIONS.md) cards"
+    fi
+else
+    report no "11b valid batch" "append failed or wrong line count"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

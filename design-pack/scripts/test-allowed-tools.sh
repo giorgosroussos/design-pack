@@ -61,7 +61,7 @@ sources = sorted(glob.glob(os.path.join(here, "stages", "*.md"))) + [os.path.joi
 commands = set()
 for path in sources:
     text = open(path, encoding="utf-8").read()
-    for m in re.finditer(r"`((?:cd |bash |python3 |make |git |mkdir |touch |cp |chmod |grep |xargs |find |sh )[^`]*)`", text):
+    for m in re.finditer(r"`((?:cd |bash |python3 |make |git |mkdir |touch |cp |chmod |grep |xargs |sh )[^`]*)`", text):
         commands.add((os.path.relpath(path, here), m.group(1)))
 
 bad, total = [], 0
@@ -75,11 +75,22 @@ for src, raw in sorted(commands):
 
 print("allowed-tools acceptance")
 print("  %d Bash patterns, %d instructed subcommands from %d sources" % (len(patterns), total, len(sources)))
+
+# The session-long grant offered to the owner must carry exactly the skill's Bash patterns.
+import json
+settings = json.load(open(os.path.join(here, "templates", "claude-settings.local.json"), encoding="utf-8"))
+granted = sorted(r[5:-1].replace("{{SKILL_DIR}}", "/skill") for r in settings["permissions"]["allow"] if r.startswith("Bash("))
+if granted != sorted(patterns):
+    only_skill = sorted(set(patterns) - set(granted)); only_grant = sorted(set(granted) - set(patterns))
+    print("  FAIL  templates/claude-settings.local.json and SKILL.md allowed-tools differ: only in SKILL.md %s; only in the template %s" % (only_skill, only_grant))
+    bad.append(("SKILL.md", "allowed-tools", "claude-settings.local.json out of sync"))
+else:
+    print("  PASS  templates/claude-settings.local.json carries the same %d Bash patterns as allowed-tools" % len(granted))
 if bad:
     for src, raw, sub in bad:
         print("  FAIL  %s: `%s` has no pattern for `%s`" % (src, raw, sub))
     print("\n%d passed, %d failed" % (total - len(bad), len(bad)))
     sys.exit(1)
 print("  PASS  every instructed subcommand matches an allowed-tools pattern")
-print("\n1 passed, 0 failed")
+print("\n2 passed, 0 failed")
 PYEOF

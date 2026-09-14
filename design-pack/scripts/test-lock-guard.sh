@@ -271,6 +271,7 @@ fi
 # before and after the change and refuses any path whose tier would go down.
 
 HEAD7="$(git rev-parse HEAD)"
+chmod u+w .doc-locks
 printf '\nfree: docs/inputs/**\n' >> .doc-locks
 chmod u+w docs/inputs/requirements.md
 printf 'Edited under a self-granted demotion.\n' >> docs/inputs/requirements.md
@@ -287,6 +288,7 @@ chmod 0444 docs/inputs/requirements.md
 
 # the two-push variant: push 1 only demotes, push 2 would use it. The server
 # judges push 1 with the manifest it replaces and compares it to the one pushed.
+chmod u+w .doc-locks
 printf '\nfree: docs/inputs/**\n' >> .doc-locks
 git add .doc-locks
 git commit -q --no-verify -m "push 1: demote only" >/dev/null 2>&1
@@ -313,6 +315,7 @@ chmod 0444 docs/inputs/requirements.md
 
 # --- 8. the lock layer guards itself -------------------------------------------
 
+chmod u+w scripts/lock-guard.py
 printf '# weakened\n' >> scripts/lock-guard.py
 git add scripts/lock-guard.py
 if guard; then
@@ -326,6 +329,7 @@ git reset -q --hard "$HEAD7"
 
 # a promotion is the one manifest change the pack needs; with the Stage C
 # manifest it is a ceremony, and it goes through
+chmod u+w .doc-locks
 printf '\nhard-locked: specs/**\n' >> .doc-locks
 git add .doc-locks
 if guard; then
@@ -508,6 +512,24 @@ then
 else
     report no "6 policy unit cases" "see the lines above"
 fi
+
+# --- 9. --relock: the mode bits follow the manifest ----------------------------
+
+chmod u+w docs/inputs/requirements.md scripts/lock-guard.py .doc-locks 2>/dev/null
+printf 'x\n' > docs/inputs/extra.md
+n="$(python3 scripts/lock-guard.py --relock --quiet; python3 scripts/lock-guard.py --relock | sed 's/[^0-9]//g')"
+m1="$(ls -l docs/inputs/requirements.md | cut -c1-10)"; m2="$(ls -l docs/inputs/extra.md | cut -c1-10)"
+m3="$(ls -l scripts/lock-guard.py | cut -c1-10)"; m4="$(ls -l PLAN.md | cut -c1-10)"
+m5="$(ls -l .githooks/pre-commit | cut -c1-10)"
+case "$m1$m2$m3" in *w*) ro="" ;; *) ro=1 ;; esac
+case "$m4" in *w*) freeok=1 ;; *) freeok="" ;; esac
+case "$m5" in -r-x*) hookok=1 ;; *) hookok="" ;; esac
+if [ -n "$ro" ] && [ -n "$freeok" ] && [ -n "$hookok" ]; then
+    report ok "9 --relock strips the write bits of every hard-locked file (tracked or not), keeps the hooks executable, leaves free files alone ($n files)" ""
+else
+    report no "9 --relock" "requirements=$m1 extra=$m2 guard=$m3 PLAN=$m4 pre-commit=$m5"
+fi
+rm -f docs/inputs/extra.md
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

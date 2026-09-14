@@ -45,7 +45,7 @@ check_locks()  { if [ -n "$HAVE_MAKE" ]; then make check-locks; else python3 scr
 verify_chain() { if [ -n "$HAVE_MAKE" ]; then make verify-chain; else python3 scripts/verify-chain.py; fi; }
 install_hooks() {
     if [ -n "$HAVE_MAKE" ]; then make install-hooks
-    else git config core.hooksPath .githooks; chmod +x .githooks/pre-commit .githooks/post-commit .githooks/pre-receive; fi
+    else git config core.hooksPath .githooks; chmod +x .githooks/pre-commit .githooks/post-commit .githooks/pre-receive; python3 scripts/lock-guard.py --relock; fi
 }
 
 # --- Step C1: verbatim assets -------------------------------------------------
@@ -59,7 +59,7 @@ chmod +x scripts/check-docs.py scripts/lock-guard.py scripts/unlock.sh scripts/l
 cp "$tpl/.doc-locks" .doc-locks
 for f in pre-commit post-commit pre-receive README.md; do cp "$tpl/githooks/$f" ".githooks/$f"; done
 chmod +x .githooks/pre-commit .githooks/post-commit .githooks/pre-receive
-printf '.doc-unlock\n__pycache__/\n' > .gitignore
+printf '.doc-unlock\n__pycache__/\n.claude/settings.local.json\n' > .gitignore
 
 # --- rendering ----------------------------------------------------------------
 # One renderer for every template: strip the TEMPLATE NOTES block, drop the
@@ -453,7 +453,12 @@ git add specs/README.md && git commit -q -m "stamp the baseline" >/dev/null 2>&1
 
 # the manifest is hard-locked, so the promotion is a ceremony (D4 step 2)
 printf '\n# Frozen at the baseline, 2026-09-08: the contract itself.\nhard-locked: specs/**\n' > "$work/promotion"
-cat "$work/promotion" >> .doc-locks
+if cat "$work/promotion" >> .doc-locks 2>/dev/null; then
+    report no "5f the manifest is writable after install-hooks" "the re-lock pass left .doc-locks writable"
+else
+    report ok "5f after install-hooks the hard-locked manifest refuses an in-session write at the filesystem" ""
+fi
+chmod u+w .doc-locks && cat "$work/promotion" >> .doc-locks
 git add .doc-locks
 if check_locks > "$work/locks6.out" 2>&1; then
     report no "6 promotion without a ceremony" "the guard let .doc-locks change without an unlock"
@@ -489,6 +494,7 @@ else
 fi
 
 # the lock layer guards itself: the guard cannot be edited by the diff it judges
+chmod u+w scripts/lock-guard.py
 printf '# weakened\n' >> scripts/lock-guard.py
 git add scripts/lock-guard.py
 if check_locks > "$work/locks6e.out" 2>&1; then

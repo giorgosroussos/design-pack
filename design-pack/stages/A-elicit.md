@@ -28,7 +28,16 @@ and waiting for the owner.
 4. State in the conversation, in this order: what was received; what is treated as
    authoritative and why; what is non-authoritative and what it will be used for; what the
    inputs are silent on (stack, deployment, jurisdiction, budget, existing systems).
-5. Stop. Ask the owner to confirm or correct the authority levels. Do not extract yet.
+5. Stop. Ask the owner to confirm or correct the authority levels. Do not extract yet. In the
+   same message, say this once: the skill's pre-approved commands last for this turn only, so
+   from the next reply on every command and file write will ask for permission unless the owner
+   allows the skill's patterns for the session. Offer the project-local form — "say *allow* and
+   I write `.claude/settings.local.json` in this directory from the skill's template, with the
+   same patterns as the skill's own list; it is not committed" — and name the alternative, the
+   same rules in `~/.claude/settings.json` for every project (the install notes show them). On
+   *allow*, render `templates/claude-settings.local.json` with `{{SKILL_DIR}}` = the skill's
+   directory into `<target>/.claude/settings.local.json` at the start of the next round, and
+   nothing else changes. Without it, the run still works; it just asks.
 
 ## Round A1 — Extract (when `A-extract`)
 
@@ -53,9 +62,11 @@ and waiting for the owner.
    whatever their surface; the index line carries the surface, so the order is still readable. One event per card:
    `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/log-append.py --root <target> --stream questions --type card-opened --payload-file -`
    with the payload on stdin (`id`, `title`, `surface`, `source`, `question`, `options` as a JSON
-   array, `recommendation`, `blocks: specification`). The tool refuses a card whose options carry
-   no consequence, whose surface is not one of the five, or that tries to open as anything but
-   Blocking.
+   array, `recommendation`, `blocks: specification`) — or, for a whole round, one JSON array of
+   such payloads in a file written to the scratchpad and passed with `--payload-file <file>`:
+   every element is validated first and the batch is appended all or nothing. The tool refuses a
+   card whose options carry no consequence, whose surface is not one of the five, or that tries
+   to open as anything but Blocking.
 6. `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/rebuild-questions.py --root <target>`. The index and the
    Blocking, Open and Resolved sections are generated: every new card sits under `## Blocking`;
    a `card-deferred` event moves it to `## Open`; nothing places it by hand.

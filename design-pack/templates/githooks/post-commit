@@ -11,6 +11,6 @@ token=".doc-unlock"
 paths="$(sed -n 's/^path: *//p' "$token")"
 rm -f -- "$token"
 printf '%s\n' "$paths" | while IFS= read -r path; do
-    [ -n "$path" ] && [ -e "$path" ] && chmod 0444 -- "$path" || true
+    [ -n "$path" ] && [ -e "$path" ] && chmod a-w -- "$path" || true
 done
 echo "lock-guard: unlock token consumed; the path is read-only again."

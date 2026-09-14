@@ -28,6 +28,11 @@ at the top of `eventlog.py`.
     echo '{"id":"D-005", ...}' | python3 scripts/log-append.py \
         --type decision-added --payload-file -
 
+    python3 scripts/log-append.py --stream questions --type card-opened --payload-file cards.json
+        # cards.json holds a JSON ARRAY: every element is validated and checked against the
+        # projection before anything is written, then all are appended in order. One
+        # command for a batch, instead of one process per card.
+
 Exit status: 0 appended, 2 usage or invalid event, 3 the chain does not verify.
 """
 
@@ -92,26 +97,36 @@ def main():
         except ValueError as exc:
             sys.stderr.write("log-append: payload is not valid JSON: %s\n" % exc)
             return 2
+    batch = isinstance(payload, list)
+    payloads = payload if batch else [payload]
+    if batch and args.set:
+        sys.stderr.write("log-append: --set cannot be combined with a JSON array payload\n")
+        return 2
+    if not payloads:
+        sys.stderr.write("log-append: the payload array is empty\n")
+        return 2
     for pair in args.set:
         if "=" not in pair:
             sys.stderr.write("log-append: --set wants KEY=VALUE, got %r\n" % pair)
             return 2
         key, value = pair.split("=", 1)
-        payload[key] = value
+        payloads[0][key] = value
 
-    try:
-        payload = eventlog.validate(args.stream, args.event_type, payload)
-    except eventlog.LogError as exc:
-        sys.stderr.write("log-append: %s\n" % exc)
-        return 2
-
-    if args.stream == eventlog.DECISIONS_STREAM and args.event_type == "decision-added":
-        dead = dead_citations(root, payload)
-        if dead:
-            sys.stderr.write("log-append: this decision cites a section that does not exist, and on an "
-                             "append-only log the text could never be fixed; refused.\n  %s\n"
-                             % "\n  ".join(dead))
+    validated = []
+    for i, one in enumerate(payloads):
+        try:
+            one = eventlog.validate(args.stream, args.event_type, one)
+        except eventlog.LogError as exc:
+            sys.stderr.write("log-append: %s%s\n" % ("element %d: " % i if batch else "", exc))
             return 2
+        if args.stream == eventlog.DECISIONS_STREAM and args.event_type == "decision-added":
+            dead = dead_citations(root, one)
+            if dead:
+                sys.stderr.write("log-append: %sthis decision cites a section that does not exist, and on an "
+                                 "append-only log the text could never be fixed; refused.\n  %s\n"
+                                 % ("element %d: " % i if batch else "", "\n  ".join(dead)))
+                return 2
+        validated.append(one)
 
     path = eventlog.log_path(root)
     directory = os.path.dirname(path)
@@ -127,23 +142,31 @@ def main():
         sys.stderr.write("log-append: refusing to append onto a broken chain.\n  %s\n" % exc)
         return 3
 
+    # Build and check every record before writing any: a batch is all or nothing.
     seq, prev = eventlog.head(records)
-    record = eventlog.build(seq + 1, args.ts or now(), args.actor,
-                            args.stream, args.event_type, payload, prev)
-
-    try:
-        eventlog.check_appendable(records, record)
-    except eventlog.LogError as exc:
-        sys.stderr.write("log-append: this event cannot be projected, so it is refused "
-                         "rather than appended to a log that nothing can take it out of.\n  %s\n" % exc)
-        return 2
+    pending, new_records = list(records), []
+    for i, one in enumerate(validated):
+        record = eventlog.build(seq + 1 + i, args.ts or now(), args.actor,
+                                args.stream, args.event_type, one, prev)
+        try:
+            eventlog.check_appendable(pending, record)
+        except eventlog.LogError as exc:
+            sys.stderr.write("log-append: %sthis event cannot be projected, so it is refused "
+                             "rather than appended to a log that nothing can take it out of.\n  %s\n"
+                             % ("element %d: " % i if batch else "", exc))
+            return 2
+        pending.append(record)
+        new_records.append(record)
+        prev = record["hash"]
 
     with open(path, "a", encoding="utf-8", newline="\n") as fh:
-        fh.write(eventlog.dumps(record) + "\n")
+        for record in new_records:
+            fh.write(eventlog.dumps(record) + "\n")
 
     if not args.quiet:
-        print("appended seq %d %s/%s hash %s"
-              % (record["seq"], record["stream"], record["type"], record["hash"][:16]))
+        for record in new_records:
+            print("appended seq %d %s/%s hash %s"
+                  % (record["seq"], record["stream"], record["type"], record["hash"][:16]))
     return 0
 
 

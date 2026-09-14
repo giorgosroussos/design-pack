@@ -112,6 +112,16 @@ You'll receive the skill as a folder named `design-pack`. You need Claude Code i
 1. **Place the skill.** Unpack it so you have `~/.claude/skills/design-pack/SKILL.md` (and the
    `stages/`, `reference/`, `templates/`, `scripts/` subfolders beside it).
 
+   *About permission prompts.* A skill's pre-approved commands last for one turn, and this skill
+   stops for you many times, so without a standing grant Claude Code will ask before every
+   command and file write from the second reply on. Two ways to avoid that, both your choice:
+   at the first stop the skill offers to write the grant into the trial directory's
+   `.claude/settings.local.json` (say *allow*); or put the same rules into
+   `~/.claude/settings.json` once, for every project — they are listed in
+   `templates/claude-settings.local.json` with `{{SKILL_DIR}}` replaced by the skill's path.
+   Nothing in either list reaches beyond the skill's scripts, the pack's `make` targets and
+   the file operations the pack needs.
+
 2. **Make a working directory and initialise git in it.** The integrity layer only enforces
    anything inside a git repository, so this step matters:
    ```
