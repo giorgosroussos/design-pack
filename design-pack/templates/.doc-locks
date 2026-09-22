@@ -37,6 +37,14 @@ free: Makefile
 free: scripts/**
 free: .githooks/**
 
+# The layer notes: one per delivered work package, written and appended to by the
+# sessions that build. Free for the same reason PLAN.md is — changing is what they
+# are for. The glob does not overlap `hard-locked: docs/inputs/**` below, so the
+# last-match-wins rule is not engaged here and this line's position is not
+# load-bearing, unlike every other line in this file.
+free: docs/layers/**
+free: docs/gotchas.md
+
 
 # specs/ stays free until the baseline is stamped: review rounds still rewrite
 # statements and their provenance tags. The freeze promotes it to hard-locked.

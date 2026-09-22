@@ -164,6 +164,38 @@ git reset -q HEAD docs/inputs/requirements.md
 git checkout -- docs/inputs/requirements.md
 chmod 0444 docs/inputs/requirements.md
 
+# --- 3b. a layer note and a gotcha are free, beside the hard-locked inputs -----
+# Both live under docs/, which is why the manifest's two globs are written not to
+# overlap: the raw material is the owner's and never changes, the notes are the
+# sessions' and change constantly.
+
+mkdir -p docs/layers
+printf '# FND-01 — the layer\n\n## What this package established\n\nx\n' > docs/layers/FND-01.md
+printf '# Gotchas\n\nThe runner prints nothing on a fatal error unless PAO_DISABLE=1.\n' > docs/gotchas.md
+chmod u+w docs/inputs/requirements.md
+printf 'A line the owner never wrote.\n' >> docs/inputs/requirements.md
+git add docs/layers/FND-01.md docs/gotchas.md docs/inputs/requirements.md
+if guard; then
+    report no "3b docs/: a write to the hard-locked inputs in the same commit" "guard exited 0"
+elif grep -q 'docs/inputs/requirements.md' "$work/guard.out" \
+     && ! grep -q 'docs/layers/FND-01.md' "$work/guard.out" \
+     && ! grep -q 'docs/gotchas.md' "$work/guard.out"; then
+    report ok "3b docs/: the layer note and the gotchas file are free; only the input is refused" ""
+else
+    report no "3b docs/ tiers" "$(cat "$work/guard.out")"
+fi
+git reset -q HEAD docs/layers/FND-01.md docs/gotchas.md docs/inputs/requirements.md
+git checkout -- docs/inputs/requirements.md
+chmod 0444 docs/inputs/requirements.md
+git add docs/layers/FND-01.md docs/gotchas.md
+if guard; then
+    report ok "3c docs/: the two free paths commit on their own" ""
+else
+    report no "3c docs/ free paths" "$(cat "$work/guard.out")"
+fi
+git reset -q HEAD docs/layers/FND-01.md docs/gotchas.md
+rm -rf docs/layers docs/gotchas.md
+
 # --- 4. the ceremony: unlock, change, commit ----------------------------------
 
 if unlock_cmd docs/inputs/requirements.md "the owner sent a corrected page"; then

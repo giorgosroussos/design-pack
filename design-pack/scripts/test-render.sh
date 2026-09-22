@@ -234,6 +234,10 @@ render("UNLOCKS.md", "UNLOCKS.md")
 render("log-README.md", ".log/README.md")
 P["ROWS"] = "| `requirements.md` | %s | requirements | authoritative |" % DATE
 render("docs-inputs-README.md", "docs/inputs/README.md")
+# C1.5b: the two homes an implementation session writes into, both empty of content.
+os.makedirs("docs/layers", exist_ok=True)
+render("docs-layers-README.md", "docs/layers/README.md")
+render("gotchas.md", "docs/gotchas.md")
 render("AGENTS.md", "AGENTS.md")
 render("SESSION_BOOTSTRAP_PROMPT_SAMPLE.md", "SESSION_BOOTSTRAP_PROMPT_SAMPLE.md")
 render("specs/README.md", "specs/README.md")
@@ -547,6 +551,58 @@ else
     report no "8 task-policy" "$(grep -E '^FAIL' "$work/cd8.out" | head -3)"
 fi
 git checkout -q -- "specs/07-implementation-plan.md"
+
+# --- 9. the two homes a session writes into, and the index that stays an index --
+
+if [ -f docs/layers/README.md ] && [ -f docs/gotchas.md ] \
+   && grep -q '^free: docs/layers/\*\*$' .doc-locks && grep -q '^free: docs/gotchas.md$' .doc-locks; then
+    report ok "9 the rendered pack has docs/layers/ and docs/gotchas.md, both free in the manifest" ""
+else
+    report no "9 layer notes and gotchas" "missing file or manifest line"
+fi
+
+if grep -q '^## Layer notes$' AGENTS.md && grep -q 'None yet: no package has been delivered' AGENTS.md; then
+    report ok "9b AGENTS.md carries an empty Layer notes index: nothing is delivered yet" ""
+else
+    report no "9b the index" "no empty `## Layer notes` section in AGENTS.md"
+fi
+
+# A package that reaches `done` owes a note; the gate is what says so.
+chmod u+w TRACEABILITY.md
+sed -i 's/^| FND-02 | 0 | \(.*\) | not started | \xe2\x80\x94 |/| FND-02 | 0 | \1 | done | 2026-09-08: the pipeline ran green on the remote |/' TRACEABILITY.md
+if check_docs > "$work/cd9.out" 2>&1; then
+    report no "9c a done package with no layer note passes" "check-docs exited 0"
+elif grep -q 'FAIL layer-notes .*docs/layers/FND-02.md' "$work/cd9.out"; then
+    report ok "9c a package that reaches done without a layer note fails the gate" ""
+else
+    report no "9c layer-notes in the whole gate" "$(grep -E '^FAIL' "$work/cd9.out" | head -3)"
+fi
+
+mkdir -p docs/layers
+printf '# FND-02 — the CI baseline\n\n## What this package established\n\nOne job per `make` target; `README.md` maps job to command.\n\n## What a later slice must not do\n\nDo not add a gate that CI runs and `make verify` does not.\n\n## Handoff\n\n### 2026-09-08\n\n- Changed: the pipeline definition.\n' > docs/layers/FND-02.md
+python3 - <<'PYIDX'
+t = open("AGENTS.md", encoding="utf-8").read()
+open("AGENTS.md", "w", encoding="utf-8", newline="\n").write(t.replace(
+    "None yet: no package has been delivered. The first one to reach `done` adds its line.",
+    "- FND-02 — the CI baseline \u2192 `docs/layers/FND-02.md`"))
+PYIDX
+if check_docs > "$work/cd9d.out" 2>&1; then
+    report ok "9d the note plus its index line satisfies the gate" ""
+else
+    report no "9d note and index" "$(grep -E '^FAIL' "$work/cd9d.out" | head -3)"
+fi
+
+# The trap this rule exists to close: the knowledge written into AGENTS.md instead.
+printf '\n## The FND-02 layer every later package builds on\n\nprose that every session will read forever\n' >> AGENTS.md
+if check_docs > "$work/cd9e.out" 2>&1; then
+    report no "9e a per-package section in AGENTS.md passes" "check-docs exited 0"
+elif grep -q 'FAIL layer-notes .*AGENTS.md' "$work/cd9e.out"; then
+    report ok "9e a section per package in AGENTS.md fails the gate, naming the note it belongs in" ""
+else
+    report no "9e per-package section" "$(grep -E '^FAIL' "$work/cd9e.out" | head -3)"
+fi
+git checkout -q -- AGENTS.md TRACEABILITY.md
+rm -rf docs/layers/FND-02.md
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

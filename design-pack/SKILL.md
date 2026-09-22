@@ -125,6 +125,12 @@ unacceptable state.
   the freeze promotes them (`stages/D-review.md` D4).
 - **One home per rule.** `AGENTS.md`, `CLAUDE.md`, the playbook and the prompts point at each
   other; they do not repeat each other.
+- **One home per kind of knowledge.** `specs/` says what the product must do; a `D-NNN` says why a
+  judgement went one way; `docs/layers/<PACKAGE>.md` says what the delivered code now does that a
+  later slice must not get wrong, and carries that session's handoff; `docs/gotchas.md` says what
+  the tooling does that an agent cannot predict. `AGENTS.md` indexes the layer notes and never
+  holds one — a section per package there is read by every session forever, which is how an entry
+  point grows past the point where anyone reads it, and `check-docs` (`layer-notes`) refuses it.
 - **Decisions and cards are logs, not files.** `DECISIONS.md` and `QUESTIONS.md` are projections
   of the `decisions` and `questions` streams of `.log/events.jsonl`, rendered by
   `templates/scripts/rebuild-decisions.py` and `rebuild-questions.py`. The log is the source of
@@ -173,6 +179,8 @@ unacceptable state.
 | `templates/decisions-seed.json` | the five regime records Stage B appends to a fresh log |
 | `templates/claude-settings.local.json` | the skill's command patterns as a session-long permission grant, offered to the owner at the intake stop |
 | `templates/log-README.md` | the log's own README: canonical form, and what the chain does not guarantee |
+| `templates/docs-layers-README.md` | `docs/layers/`: one note per delivered work package, the shape of a note, and the rule that `AGENTS.md` indexes them and never holds one |
+| `templates/gotchas.md` | `docs/gotchas.md`: what the tooling does that an agent cannot predict, empty until a session learns it |
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |
 | `scripts/test-task-policy.sh` | the `task-policy` rule and the `--task` reader over a fixture pack: derived characteristics, the policy table, and `blocked-by` as a live read |

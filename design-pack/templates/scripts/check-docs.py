@@ -64,6 +64,12 @@ Rules
                 their streams, so no hand edit can survive this gate
   red-lines     every bullet under AGENTS.md "Non-negotiable constraints" cites
                 at least one spec section
+  layer-notes   every work package that TRACEABILITY.md calls `done` has a layer
+                note in docs/layers/<PACKAGE>.md carrying the three headings the
+                note's README states, and a line in the AGENTS.md "Layer notes"
+                index; every note names a package the plan defines; and no
+                AGENTS.md heading names a work package, which is what keeps the
+                entry point an index of the layers rather than a copy of them
   commands      every `make <target>` listed in AGENTS.md "Commands" is a target
                 in the root Makefile
   agents-size   AGENTS.md stays under its byte ceiling
@@ -102,6 +108,9 @@ ROOT_DOCS = ["AGENTS.md", "PLAN.md", "DECISIONS.md", "GAPS.md", "QUESTIONS.md",
 SPECS_DIR = "specs"
 PLAN_MAX_LINES = 100
 AGENTS_MAX_BYTES = 20_000
+LAYERS_DIR = os.path.join("docs", "layers")
+LAYER_HEADINGS = ["What this package established", "What a later slice must not do", "Handoff"]
+LAYER_INDEX_HEADING = "Layer notes"
 SURFACES = {"data", "security", "scope", "external", "ux"}
 STATUSES = {"not started", "in progress", "done"}
 DECISION_TYPES = {"implementation", "spec-amendment", "adr"}
@@ -792,6 +801,72 @@ def check_agents(root):
 
 
 
+# --- layer notes --------------------------------------------------------------
+#
+# The knowledge a delivered package leaves behind - the names a later slice calls
+# and the alternatives this layer has closed - has exactly one home, and it is not
+# AGENTS.md. A section per package there is read by every session forever and is
+# what makes an entry point grow past the point where anyone reads it; a note per
+# package in docs/layers/ is read only by the sessions whose dependencies name it.
+# This rule holds both halves: the note exists for work that is done, and the
+# entry point carries the index and never the content.
+
+
+def layer_note_path(root, package):
+    return os.path.join(root, LAYERS_DIR, "%s.md" % package)
+
+
+def check_layer_notes(root, pkgs, rows):
+    done = sorted(p for p, (_, status, _) in rows.items() if status == "done")
+    layers = os.path.join(root, LAYERS_DIR)
+    agents = os.path.join(root, "AGENTS.md")
+    index = None
+    if exists(agents):
+        text = read(agents)
+        index = section_text(text, LAYER_INDEX_HEADING)
+        if index is None:
+            fail("layer-notes", "AGENTS.md", "no `## %s` section to index the notes" % LAYER_INDEX_HEADING)
+        for ln, line in enumerate(strip_fences(text).splitlines(), 1):
+            if not line.startswith("#"):
+                continue
+            for m in WP_RE.finditer(line):
+                fail("layer-notes", "AGENTS.md:%d" % ln,
+                     "heading names the work package %s; this file indexes the layer notes and "
+                     "never holds one (`%s/%s.md`)" % (m.group(1), LAYERS_DIR, m.group(1)))
+
+    if not os.path.isdir(layers):
+        if done:
+            fail("layer-notes", "%s/" % LAYERS_DIR,
+                 "missing, and %d package(s) are `done`: %s" % (len(done), ", ".join(done)))
+        return
+    for name in sorted(os.listdir(layers)):
+        # README.md documents the form and `_`-prefixed files are the shipped
+        # shape of a note; neither claims to be one.
+        if not name.endswith(".md") or name == "README.md" or name.startswith("_"):
+            continue
+        pkg = name[:-3]
+        if pkgs and pkg not in pkgs:
+            fail("layer-notes", "%s/%s" % (LAYERS_DIR, name),
+                 "names no work package in the implementation plan")
+    for p in done:
+        path = layer_note_path(root, p)
+        rel = os.path.relpath(path, root)
+        if not exists(path):
+            fail("layer-notes", rel,
+                 "%s is `done` in TRACEABILITY.md and has no layer note. A package that "
+                 "established nothing a later slice can get wrong still has one, and says so." % p)
+            continue
+        heads = [h.strip() for h in re.findall(r"^##\s+(.*)$", read(path), re.M)]
+        for h in LAYER_HEADINGS:
+            if h not in heads:
+                fail("layer-notes", rel, "no `## %s` section" % h)
+        if index is not None and p not in index:
+            fail("layer-notes", "AGENTS.md",
+                 "%s has a layer note that the `%s` index does not carry" % (p, LAYER_INDEX_HEADING))
+    ok("layer-notes", "%d done package(s), %d note(s)" % (
+        len(done), len([n for n in os.listdir(layers)
+                        if n.endswith(".md") and n != "README.md" and not n.startswith("_")])))
+
 # --- task characteristics and the prompt-selection policy ---------------------
 #
 # The pack states DATA (what kind of task a package is); AGENTS.md states POLICY
@@ -1206,6 +1281,7 @@ def main():
     check_inferred(inferred, is_frozen)
     provisional = provisional_citations(root, specs, cards)
     check_agents(root)
+    check_layer_notes(root, pkgs, rows)
     check_task_policy(root, cards)
     events, chain_ok = check_log(root)
     makefile = os.path.join(root, "Makefile")

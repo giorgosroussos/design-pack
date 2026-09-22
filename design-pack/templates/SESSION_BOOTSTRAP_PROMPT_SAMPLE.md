@@ -23,7 +23,8 @@ Prompt 1 runs for every task; prompts 2 and 3 are conditional, and the condition
 Implement the current `Now` item in PLAN.md using AGENTS.md as the working contract.
 
 Before changing anything, read AGENTS.md, PLAN.md, QUESTIONS.md, GAPS.md and TRACEABILITY.md,
-then the DECISIONS.md index and the D-entries the `Now` item cites, then specs/README.md,
+then the DECISIONS.md index and the D-entries the `Now` item cites, then the layer note
+(docs/layers/<PACKAGE>.md) of every package the item names as a dependency, then specs/README.md,
 specs/{{NN_REGISTER}}-decision-register.md and every spec section the `Now` item references.
 Inspect existing code and tests before editing. Restate your assumptions and flag any conflict
 with a locked decision before you start.
@@ -38,7 +39,11 @@ Record as you go, in the smallest relevant document:
 - deliberate incompleteness in GAPS.md, never hidden behind a stub;
 - anything the specs cannot answer in QUESTIONS.md as a decision card, with spec reference,
   options and their consequences;
-- verification evidence (commands run, test names) in TRACEABILITY.md.
+- verification evidence (commands run, test names) in TRACEABILITY.md;
+- what this package established, what a later slice must not do, and this session's dated
+  handoff in docs/layers/<PACKAGE>.md, with its line in the AGENTS.md "Layer notes" index;
+- a gate that failed for an environmental reason in docs/gotchas.md, with the measurement,
+  rather than retried until it passed.
 
 Spec text may be amended only where AGENTS.md allows it and only with a `spec-amendment`
 event appended to the log, and DECISIONS.md rebuilt, in the same change. Never touch a locked decision or a red line without
@@ -51,8 +56,10 @@ concealed. If a specification ambiguity materially changes data, security, scope
 commitments or UX, write it as a card in QUESTIONS.md and pause only if proceeding would make
 a costly or irreversible assumption. Otherwise state the assumption, tag it, and continue.
 
-Finish with a handoff: behaviour changed, commands run and their results, migration and
-rollback notes, security and privacy considerations, follow-ups not implemented.
+Finish by writing the handoff into the `## Handoff` section of docs/layers/<PACKAGE>.md, dated:
+behaviour changed, commands run and their results, migration and rollback notes, security and
+privacy considerations, follow-ups not implemented. Summarise it here in two or three lines.
+The file is what the next session reads; this message is not.
 Do not commit unless asked. Commit messages carry no AI attribution.
 ```
 
@@ -92,6 +99,7 @@ Run make check-docs before finishing.
 ## Notes
 
 - Keep prompts short. The living documents carry the detail; the prompt only points at them.
-- When a session ends early, ask the agent to leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful before stopping, so the next prompt 1 picks up cleanly.
+- When a session ends early, ask the agent to leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful before stopping, and to write what it learned into the package's layer note, so the next prompt 1 picks up cleanly instead of rediscovering it.
+- The layer notes are what keep `AGENTS.md` small enough to be read at the start of every session. A session that writes what it established into `AGENTS.md` instead of into its note is trading every future session's reading budget for its own convenience; `make check-docs` refuses it (`layer-notes`).
 - Replace `[TASK-ID]` with the package ID from `specs/{{NN_PLAN}}-implementation-plan.md` (for example FND-01).
 - Running every prompt on every task is not the safe default: it spends a session on passes whose dimension the package does not have. The table is the policy, and it lives in `AGENTS.md` so it can be tuned without unlocking the specs.

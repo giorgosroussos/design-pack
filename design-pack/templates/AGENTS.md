@@ -1,8 +1,12 @@
 <!-- TEMPLATE NOTES (delete this block when rendering)
 AGENTS.md is COMPILED from the spec pack in Stage C. It never says anything the specs do not say.
-Sections 2 (regime paragraphs), 6 and 7 are near-verbatim. Sections 1, 3, 4, 5, 8 are compiled.
+Named, not numbered, because this file has gained sections and will gain more: Authority (the
+regime paragraphs), Working method, Prompt selection, Layer notes and Living documents are
+near-verbatim; Product, Non-negotiable constraints, Architecture, Commands and Design direction
+are compiled.
 Ceiling: 20 KB (`check-docs` fails above it). If compiled content does not fit, the red lines
-are compressed further, never dropped; detail moves to the playbook or docs/.
+are compressed further, never dropped; detail moves to docs/. Never to the playbook: `specs/` is
+hard-locked from the freeze, so anything put there costs a ceremony to change afterwards.
 Placeholders:
   {{PRODUCT_NAME}}
   {{PRODUCT_PARAGRAPH}}        4-8 sentences: what it is, what it is not, the core loop, the actors,
@@ -30,12 +34,16 @@ Placeholders:
                                tooling the specs leave open ("chosen in DECISIONS.md")
   {{CONTRACT_DRIFT_TARGET_LINE}}  `make openapi        # ...` line or nothing
   {{INFRA_SERVICES}}
-  Section 7 (Prompt selection) is VERBATIM apart from {{NN_PLAN}}: it is policy over the
+  Prompt selection is VERBATIM apart from {{NN_PLAN}}: it is policy over the
   characteristics the plan stores, and a pack that reworded it would fail `task-policy`, which
   reads the table. It costs about 1 KB against the 20 KB ceiling.
+  Layer notes is VERBATIM and starts with the empty-index line below: no package has
+  been delivered when this file is compiled. Each delivered package later adds ONE line of about
+  90 bytes; forty packages cost ~3.6 KB against the same ceiling, which is the arithmetic that
+  makes the index the only thing that can live here and the notes themselves a directory.
   {{DESIGN_DIRECTION_SECTION}} present only when visual inputs exist: "## Design direction from <input>"
                                with the principles to carry and the cards holding the conflicts.
-                               It is the last section by design (section 8). Otherwise omit it.
+                               It is the last section by design. Otherwise omit it.
 -->
 # AGENTS.md — {{PRODUCT_NAME}}
 
@@ -64,8 +72,10 @@ This file is the entry point for every human or GenAI agent working in this repo
 
 1. `AGENTS.md`, then `PLAN.md`.
 2. `QUESTIONS.md` (Blocking and Open), `GAPS.md`, `TRACEABILITY.md`, and in `DECISIONS.md` the index plus the entries the active `PLAN.md` item cites. Read the whole of `DECISIONS.md` only when working on cross-cutting architecture.
-3. `specs/README.md` and `specs/{{NN_REGISTER}}-decision-register.md`, then the spec files cited by the active `PLAN.md` item. Read all specs before changing cross-cutting architecture, {{ISOLATION_TERM}}, authorization, the contract root or shared migrations.
-4. `docs/inputs/README.md` when a task cites a raw requirement or a non-authoritative input.
+3. The layer note of every package the active item names as a dependency (`docs/layers/<PACKAGE>.md`, indexed below), and no others.
+4. `specs/README.md` and `specs/{{NN_REGISTER}}-decision-register.md`, then the spec files cited by the active `PLAN.md` item. Read all specs before changing cross-cutting architecture, {{ISOLATION_TERM}}, authorization, the contract root or shared migrations.
+5. `docs/inputs/README.md` when a task cites a raw requirement or a non-authoritative input.
+6. `docs/gotchas.md` before running the gates for the first time in a session.
 
 ## Non-negotiable constraints
 
@@ -125,6 +135,17 @@ Work in the smallest useful vertical slice, following the task packet of `{{NN_P
 
 Definition of Ready and Done are `{{NN_PLAYBOOK}}` §5–6. Review runs as separate bounded passes after implementation, when the table in the next section selects it: correctness, security and isolation, tests, UX and accessibility (`{{NN_PLAYBOOK}}` §7). Critical and high findings block merge. Parallel work follows the lanes in `{{NN_PLAN}}` §{{PLAN_PARALLEL_SECTION}}; never parallelize migrations for the same aggregate or concurrent edits to central policies or the contract root without explicit ownership. Product Owner checkpoints are `{{NN_PLAYBOOK}}` §12. The release gate is `{{NN_TESTING}}` §{{TESTING_RELEASE_SECTION}} together with the last phase's exit criteria in `{{NN_PLAN}}` §{{PLAN_LAST_PHASE_SECTION}}.
 
+## Layer notes
+
+One note per delivered work package, in `docs/layers/`, written by the session that delivers it:
+what the package established, what a later slice must not do, and the dated handoff of every
+session that touched it. This index carries one line per note and never the content, so the
+entry point stays readable while the knowledge grows; a session reads only the notes its
+dependencies name (reading order, step 3). `docs/layers/README.md` states the form, and
+`make check-docs` (`layer-notes`) fails when a `done` package has no note or no line here.
+
+None yet: no package has been delivered. The first one to reach `done` adds its line.
+
 ## Prompt selection
 
 `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds three session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Surfaces`, `Touches red line` and `Contract change`; the first two are derived from the sections the package cites and `make check-docs` verifies them, the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four.
@@ -144,7 +165,9 @@ All at repository root. When scope changes, update the smallest relevant documen
 - `GAPS.md`: deliberate incompleteness, missing infrastructure, deferred scope, its consequence and the evidence needed to close it. Never mask a gap with a stub. A closed gap's row is removed and its ID retired.
 - `QUESTIONS.md`: a generated projection of the `questions` stream of `.log/events.jsonl`, in the decision-card format the file documents. Never edit it: open, answer, defer, reactivate, resolve and supersede cards by appending events (`scripts/log-append.py`) and running `make rebuild-questions`, so a card moves between Blocking, Open and Resolved because an event says so. Resolve a card by writing its answer into the specs with a `[Q-NNN]` tag, or into a decision after the baseline, and appending `card-resolved`; never by deleting it. An owner who changes their mind gets a new card and a `card-superseded` event: the old card stays Resolved and readable, and the citation moves to its successor, which `check-docs` expects. Before a phase starts, resolve the Open cards whose `Blocks:` names it.
 - `TRACEABILITY.md`: work packages from `specs/{{NN_PLAN}}-implementation-plan.md` and the critical journeys from `{{NN_TESTING}}` §{{TESTING_JOURNEYS_SECTION}} mapped to status and concrete evidence (test names, commands). Status is set only from evidence that ran and passed, never from plans, file presence or stubs. The product-intent scope matrix remains the traceability file in `specs/`, owner-maintained.
+- `docs/layers/<PACKAGE>.md`: what each delivered package established, what a later slice must not do, and its handoff. Written by the session that delivers the package, appended to by any session that changes the layer, indexed in the section above. Never a second copy of the specification: `specs/` says what the product must do, a note says what the code now does about it.
+- `docs/gotchas.md`: what the tooling does that an agent cannot predict — a gate that is known to be flaky and the evidence for it, a tool whose output is unreadable under an agent and the flag that fixes it, an environment trap. A gate that fails for an environmental reason is recorded here, never retried into green.
 - `.doc-locks`: which files are hard-locked, append-only or free, one `tier: glob` per line, last match wins. `scripts/lock-guard.py` enforces it over the diff from `.githooks/pre-commit` and from the pre-receive hook on the remote; `.githooks/README.md` says why both exist. Run `make install-hooks` once per clone. A hard-locked file changes only through `make unlock PATH=<path> REASON="..."`, which records the reason in `UNLOCKS.md` and authorizes exactly that path for exactly one commit. Tiers only ever go up: promoting a file is a line appended to `.doc-locks` through the same ceremony (the manifest is hard-locked), and the guard refuses any change that would lower a path's tier.
-- `AGENTS.md` itself stays under 20 KB; when it does not fit, content moves to `specs/{{NN_PLAYBOOK}}-agent-playbook.md` or `docs/`, never into `CLAUDE.md`.
+- `AGENTS.md` itself stays under 20 KB, and `make check-docs` (`agents-size`) enforces it. When it does not fit: knowledge about one package moves to that package's layer note, knowledge about the tooling to `docs/gotchas.md`, and anything else to `docs/`. Never into `CLAUDE.md`, and never into the playbook — `specs/` is hard-locked from the freeze, so an addition there costs a ceremony per slice. This file never grows a section of its own per package; the index above is the only thing it carries about them, and `layer-notes` fails on a heading here that names a package.
 
 {{DESIGN_DIRECTION_SECTION}}

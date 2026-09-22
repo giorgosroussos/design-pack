@@ -23,7 +23,7 @@ Every agent receives:
 
 - one task ID and one concrete outcome;
 - exact relevant spec files and sections;
-- repository conventions and current architecture notes;
+- repository conventions, and the layer note of every package this one depends on (`docs/layers/<PACKAGE>.md`), which is where the architecture those packages established is written down;
 - dependencies already merged;
 - files or modules it may change and the known shared-file owner;
 - executable acceptance criteria;
@@ -133,7 +133,7 @@ Contract-first for shared work across components. The owning agent publishes {{C
 
 ## 10. Context and handoff discipline
 
-Keep a short task log or merge description with decisions and commands. New agents inspect the merged repository and the task handoff rather than trusting stale prose. If code contradicts specs, stop and escalate; do not silently choose one. Before ending a session, leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful about what actually runs and passes.
+The handoff is a file, not a message: it is the `## Handoff` section of this package's layer note (`docs/layers/<PACKAGE>.md`), dated, carrying what changed, the commands run and their results, migration and rollback notes and the follow-ups not implemented. A handoff written only into a session transcript is lost to the next session, which then reconstructs it from the living documents and makes them grow. New agents read the merged repository and that note rather than trusting stale prose. If code contradicts specs, stop and escalate; do not silently choose one. Before ending a session, leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful about what actually runs and passes.
 
 ## 11. Example prompt for an implementation agent
 

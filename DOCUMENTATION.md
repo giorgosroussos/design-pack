@@ -34,12 +34,27 @@ UNLOCKS.md             one line per ceremonial unlock of a locked file
 .githooks/             pre-commit, post-commit and the pre-receive mirror
 scripts/               check-docs, lock-guard, the log tools, unlock
 docs/inputs/           the raw material, verbatim, with an authority README
+docs/layers/           one note per delivered work package: what it established, what a later
+                       slice must not do, and that session's handoff; AGENTS.md indexes them
+docs/gotchas.md        what the tooling does that an agent cannot predict, empty until it costs
+                       a session to learn
 SESSION_BOOTSTRAP_PROMPT_SAMPLE.md   the loop prompts an implementation session starts from
 ```
 
 Three document layers with one rule between them: `specs/` is the frozen contract, `AGENTS.md`
 is the operating layer that compiles it, and the root documents are the living state. Nothing is
 repeated between them; they cite each other.
+
+A fourth home exists for what implementation itself produces. What a delivered package
+established — the names a later slice calls, the alternatives this layer has already closed —
+is neither contract nor state, and it has one destination: `docs/layers/<PACKAGE>.md`, written
+by the session that delivers the package and carrying that session's handoff. `AGENTS.md` holds
+one index line per note and never the content, so the entry point stays readable while the
+knowledge grows, and a session reads only the notes its dependencies name. `layer-notes` enforces
+both halves: a `done` package owes a note, and no heading in `AGENTS.md` may name a package. The
+rule exists because the alternative was measured: in the pre-skill exemplar this method was
+generalised from, 186 of that repository's 209 KB entry point were thirty-one sections, one per
+work package, read in full by every session forever.
 
 The same separation decides which of the three session prompts a task gets. The plan states DATA:
 every work package carries `Surfaces`, `Touches red line` and `Contract change`, the first two
@@ -451,6 +466,7 @@ standard library, and it runs before any code exists.
 | `red-lines` | every red line cites at least one spec section |
 | `commands` | every command listed in `AGENTS.md` is a real Makefile target |
 | `agents-size` | `AGENTS.md` stays under 20 KB |
+| `layer-notes` | every `done` package has `docs/layers/<PACKAGE>.md` with its three headings and a line in the `AGENTS.md` index; every note names a package the plan defines; no `AGENTS.md` heading names a work package |
 | `markers` | no unrendered placeholder and no `TBD` survives |
 | `task-policy` | every work package states `Surfaces`, `Touches red line` and `Contract change`; the two derived ones equal what the pack derives from its own cards, register and red lines; the prompt-selection table in `AGENTS.md` names only the three real prompts and only characteristics the rule defines |
 
@@ -527,14 +543,14 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
-| `test-lock-guard.sh` | 24 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, two ceremonies in one commit with both paths authorized and both re-locked, plus twenty-four policy unit cases over crafted diffs and manifests, among them a new binary file under a locked glob |
+| `test-lock-guard.sh` | 26 | append-only removals, hard-locked changes, the ceremony end to end (including a commit that deletes the unlocked path), the `--no-verify` bypass and its server-side mirror, the demotion rule locally and over a demotion-only push, the guard's self-protection, a promotion with and without the ceremony, two ceremonies in one commit with both paths authorized and both re-locked, plus twenty-four policy unit cases over crafted diffs and manifests, among them a new binary file under a locked glob, and the two `docs/` tiers side by side (a layer note and the gotchas file free, the raw inputs refused, in one commit) |
 | `test-decisions-log.sh` | 17 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 34 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
-| `test-check-docs.sh` | 18 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, and that `extract-normative` reads the same detector |
+| `test-check-docs.sh` | 26 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, that `extract-normative` reads the same detector, and `layer-notes` in seven shapes (a `done` package without a note, a note missing a heading, a note absent from the index, the clean pair, the shipped README and `_`-prefixed files, a note naming no package, and a section per package in `AGENTS.md`) |
 | `test-task-policy.sh` | 15 | the `task-policy` rule and the `--task` reader over a fixture pack: a package citing a security-surfaced section, one citing none, a hand-edited `Surfaces`, a red line moving onto a package that denies it, four ways the policy table can lie, the field shapes, a package written as a single line whose citations sit on that line, and `blocked-by` answering live while the plan file stays byte-identical |
 | `test-stage-detect.sh` | 11 | a target walked through every state — empty, inputs saved, cards Blocking, answered, deferred, spec map, files, `AGENTS.md`, baseline — with the verdict asserted at each, including a Blocking card raised during Stage B |
 | `test-allowed-tools.sh` | 2 | every backticked shell command in `stages/*.md` and `SKILL.md`, split into subcommands the way Claude Code matches them, is pre-approved by an `allowed-tools` pattern |
-| `test-render.sh` | 22 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, one broken red line failing the gate, and one hand-edited task characteristic failing it |
+| `test-render.sh` | 27 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, one broken red line failing the gate, one hand-edited task characteristic failing it, and the layer-note seam through the whole gate (a package reaching `done` without a note fails; the note plus its index line passes; a per-package section in `AGENTS.md` fails) |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession

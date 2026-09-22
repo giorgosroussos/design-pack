@@ -95,6 +95,15 @@ living state documents (`PLAN.md`, `TRACEABILITY.md`, `GAPS.md`, `QUESTIONS.md`,
 the raw inputs kept verbatim; the command contract (`Makefile`); and the integrity tooling
 (the event log, the lock manifest, the git hooks, the check scripts).
 
+It also ships two empty homes for what implementation will produce, because the alternative is
+that it lands in the entry point and every later session pays to read it. `docs/layers/` takes one
+note per delivered work package — what the package established, what a later slice must not do,
+and that session's handoff — which `AGENTS.md` indexes by one line and never holds; a session
+reads only the notes its dependencies name. `docs/gotchas.md` takes what the tooling does that an
+agent cannot predict: a gate known to be flaky and the measurement behind it, a runner that prints
+nothing under an agent and the flag that fixes it. `make check-docs` refuses a `done` package
+without a note and refuses any heading in `AGENTS.md` that names a package.
+
 ## Its purpose, in one number
 
 The measure of whether a pack was good is **owner interventions per work package during

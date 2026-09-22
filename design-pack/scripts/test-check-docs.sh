@@ -277,5 +277,85 @@ else
 fi
 rm -rf specs
 
+# --- layer-notes: the note exists for what is done, the index never holds one --
+
+mkdir -p docs/layers
+printf '# AGENTS.md\n\n## Layer notes\n\nNone yet: no package has been delivered.\n' > AGENTS.md
+rows='{"FND-01": (3, "done", "ran"), "FND-02": (4, "not started", "\u2014")}'
+pkgs='{"FND-01", "FND-02"}'
+
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l1.out" 2>&1; then
+    report no "layer-notes: a done package with no note" "not reported"
+elif grep -q 'FAIL layer-notes .*docs/layers/FND-01.md.*`done`.*no layer note' "$work/l1.out"; then
+    report ok "layer-notes: a done package without a note fails, naming the file it owes" ""
+else
+    report no "layer-notes: missing note" "$(cat "$work/l1.out")"
+fi
+
+note() {  # note <path> <headings...>
+    p="$1"; shift
+    printf '# FND-01 — the command contract\n' > "$p"
+    for h in "$@"; do printf '\n## %s\n\nx\n' "$h" >> "$p"; done
+}
+note docs/layers/FND-01.md "What this package established" "Handoff"
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l2.out" 2>&1; then
+    report no "layer-notes: a note missing a heading" "not reported"
+elif grep -q 'FAIL layer-notes .*docs/layers/FND-01.md: no `## What a later slice must not do`' "$work/l2.out"; then
+    report ok "layer-notes: a note missing one of the three headings fails, naming the heading" ""
+else
+    report no "layer-notes: headings" "$(cat "$work/l2.out")"
+fi
+
+note docs/layers/FND-01.md "What this package established" "What a later slice must not do" "Handoff"
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l3.out" 2>&1; then
+    report no "layer-notes: a note the index does not carry" "not reported"
+elif grep -q 'FAIL layer-notes .*AGENTS.md: FND-01 has a layer note that the `Layer notes` index does not carry' "$work/l3.out"; then
+    report ok "layer-notes: a note absent from the AGENTS.md index fails" ""
+else
+    report no "layer-notes: index" "$(cat "$work/l3.out")"
+fi
+
+printf '# AGENTS.md\n\n## Layer notes\n\n- FND-01 — the command contract → `docs/layers/FND-01.md`\n' > AGENTS.md
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l4.out" 2>&1; then
+    report ok "layer-notes: a done package with its note and its index line passes" ""
+else
+    report no "layer-notes: clean fixture" "$(cat "$work/l4.out")"
+fi
+
+cp "$tpl/docs-layers-README.md" docs/layers/README.md
+printf 'x\n' > docs/layers/_SCRATCH.md
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l5.out" 2>&1; then
+    report ok "layer-notes: the shipped README and a `_`-prefixed file are not read as notes" ""
+else
+    report no "layer-notes: shipped files" "$(cat "$work/l5.out")"
+fi
+
+touch docs/layers/XXX-99.md
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l6.out" 2>&1; then
+    report no "layer-notes: a note naming no package" "not reported"
+elif grep -q 'FAIL layer-notes .*docs/layers/XXX-99.md: names no work package' "$work/l6.out"; then
+    report ok "layer-notes: a note whose name is not a package in the plan fails" ""
+else
+    report no "layer-notes: orphan note" "$(cat "$work/l6.out")"
+fi
+rm docs/layers/XXX-99.md
+
+printf '\n## The FND-02 layer every later slice builds on\n\nprose\n' >> AGENTS.md
+if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l7.out" 2>&1; then
+    report no "layer-notes: an AGENTS.md heading naming a package" "not reported"
+elif grep -q 'FAIL layer-notes .*AGENTS.md:[0-9]*: heading names the work package FND-02' "$work/l7.out"; then
+    report ok "layer-notes: a section per package in AGENTS.md fails, naming the note it belongs in" ""
+else
+    report no "layer-notes: per-package heading" "$(cat "$work/l7.out")"
+fi
+
+# main() has to run the rule; the function alone proves nothing
+if grep -q 'check_layer_notes(root, pkgs, rows)' scripts/check-docs.py; then
+    report ok "layer-notes: main() runs the rule with the plan's packages and the traceability rows" ""
+else
+    report no "layer-notes: main() wiring" "main() does not call check_layer_notes"
+fi
+rm -rf docs AGENTS.md
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

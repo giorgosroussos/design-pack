@@ -50,7 +50,7 @@ bash design-pack/scripts/test-stage-detect.sh
 | W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | done |
 | W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
-| W10 | Session reading cost and the knowledge a run buys | B — run economics; 1 owner decision | ~3½ days | not started |
+| W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | in progress |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -670,7 +670,7 @@ Acceptance:
 
 ## W10 — What a session must read grows without bound, and the knowledge a run buys has no home
 
-Status: not started
+Status: in progress (W10.1 and W10.6 done; W10.2–W10.5 not started)
 Decision: the two owner questions were decided on 2026-09-22 — **the owner accepted both
 recommendations as written** (Q-W10.1: a layer note for every `done` package; Q-W10.5: the two
 new characteristics live in the implementation plan). The rest are fixes.
@@ -782,14 +782,17 @@ missing note whatever the package did, and the template's body may say that noth
 established. Estimate: 1 day.
 
 Acceptance:
-- [ ] a rendered pack has `docs/layers/README.md`, `free: docs/layers/**` in the manifest, and
+- [x] a rendered pack has `docs/layers/README.md`, `free: docs/layers/**` in the manifest, and
       an empty index section in `AGENTS.md`; `test-render.sh` proves the whole gate still passes.
-- [ ] a fixture with a `done` package and no note fails `layer-notes`; adding the note with its
-      three headings passes; a note whose package the plan does not define fails.
-- [ ] an `AGENTS.md` heading containing a package ID fails `layer-notes`.
-- [ ] `test-lock-guard.sh`: a write under `docs/layers/` is accepted by the guard, and a write
-      under `docs/inputs/` is still refused, in the same commit.
-- [ ] the playbook, the reading order and prompt 1 name the file; no template still sends
+      *(cases 9, 9b)*
+- [x] a fixture with a `done` package and no note fails `layer-notes`; adding the note with its
+      three headings passes; a note whose package the plan does not define fails. *(four cases in
+      `test-check-docs.sh`, and 9c/9d through the whole gate in `test-render.sh`)*
+- [x] an `AGENTS.md` heading containing a package ID fails `layer-notes`. *(rule case, and 9e
+      through the whole gate)*
+- [x] `test-lock-guard.sh`: a write under `docs/layers/` is accepted by the guard, and a write
+      under `docs/inputs/` is still refused, in the same commit. *(cases 3b, 3c)*
+- [x] the playbook, the reading order and prompt 1 name the file; no template still sends
       overflow to `specs/`.
 
 ### W10.2 — Nothing computes what a task must read, so the prompt names whole documents
@@ -989,8 +992,11 @@ invented entries. Files: `design-pack/stages/C-operationalize.md`,
 Estimate: ½ hour.
 
 Acceptance:
-- [ ] a rendered pack has `docs/gotchas.md` with its headings and a pointer from `AGENTS.md`.
-- [ ] `test-render.sh` still green.
+- [x] a rendered pack has `docs/gotchas.md` with its headings and a pointer from `AGENTS.md`.
+      *(case 9; the pointer is in the session reading order and the living-documents list rather
+      than in `Commands` — a session looks for what to read in the reading order, and `Commands`
+      is the contract's own list)*
+- [x] `test-render.sh` still green. *(27 cases)*
 
 ### Order and measurement
 
@@ -1342,3 +1348,37 @@ Append-only. One entry per session per item touched. Form:
 - Left open: nothing. All three predate W9 and were invisible to the fixture packs, which hold no
   binary input, write every package as a bulleted block, and never run two ceremonies at once.
 
+### 2026-09-22 — W10.1 + W10.6 — done
+- Changed: **W10.1** new `design-pack/templates/docs-layers-README.md` (the directory's own
+  README: what a note answers, the three fixed headings as a fenced block, and the table of which
+  knowledge lives where); `templates/.doc-locks` gains `free: docs/layers/**` and
+  `free: docs/gotchas.md` with the comment that the globs do not overlap `hard-locked:
+  docs/inputs/**`, so last-match-wins is not engaged and those two lines' position is not
+  load-bearing; `templates/AGENTS.md` gains a verbatim `## Layer notes` section carrying the empty
+  index, a reading-order step for the dependencies' notes, living-document entries for both new
+  files, and an overflow sentence that no longer sends content to the playbook (`specs/` is
+  hard-locked from the freeze, so that was a ceremony per slice); `templates/scripts/check-docs.py`
+  gains the `layer-notes` rule and its constants; `templates/specs/agent-playbook.md` §2's
+  "architecture notes" and §10's "short task log" both name the file; prompt 1 reads the
+  dependencies' notes, writes the note as part of the slice and lands its handoff in the note's
+  `## Handoff` rather than in a transcript the next session cannot read; Stage C step C1.5b creates
+  both homes. **W10.6** new `templates/gotchas.md`, three headings and no invented content.
+  Docs: `SKILL.md` files table and a new hard rule (one home per kind of knowledge),
+  `DOCUMENTATION.md` §1, the gates table and the suite table, `design-pack-overview.md`
+  §What it produces.
+- Proved by: eight suites green — 26 + 17 + 34 + 26 + 27 + 2 + 11 + 15 = 158 cases, up from 143.
+  `test-check-docs.sh` +8 (a `done` package with no note; a note missing one of the three
+  headings; a note the index does not carry; the clean pair; the shipped README and a
+  `_`-prefixed file not read as notes; a note naming no package; a per-package heading in
+  `AGENTS.md`; and that `main()` runs the rule with the plan's packages and the traceability
+  rows). `test-render.sh` +5 (both homes rendered and free in the manifest; the empty index;
+  a package reaching `done` without a note failing the whole gate; the note plus its index line
+  passing it; a per-package section in `AGENTS.md` failing it). `test-lock-guard.sh` +2 (the two
+  `docs/` tiers in one commit, and the two free paths committing on their own).
+- Left open: nothing in these two items. One thing was dropped deliberately during the work: a
+  `docs/layers/_TEMPLATE.md` shipped into the target would have been the only file in a generated
+  pack carrying `{{...}}`, and the pack's "no unrendered placeholder" rule is worth more than the
+  convenience, so the note's shape is the fenced block in `docs/layers/README.md` and
+  `templates/layer-note.md` was deleted rather than shipped. Packs generated before this change
+  have no `docs/layers/`, no index section and no `docs/gotchas.md`; their first `done` package
+  fails `layer-notes` until the three are added, which is the intended migration.

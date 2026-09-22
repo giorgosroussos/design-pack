@@ -58,6 +58,15 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
 4. Render `Makefile` from its template (product name; keep or drop the contract-drift target).
 5. Render `CLAUDE.md`, `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` and `README.md` from their
    templates. Placeholders only; no new rules.
+5b. Create the two homes the implementation sessions write into, both empty of content and
+   neither invented by this stage: `mkdir -p <target>/docs/layers`, render
+   `templates/docs-layers-README.md` into `<target>/docs/layers/README.md`, and render
+   `templates/gotchas.md` into `<target>/docs/gotchas.md`. The note's shape is the fenced block inside
+   that README and is not shipped as a second file: a template carrying `{{...}}` in the target
+   would be the one place the pack's own "no unrendered placeholder" rule does not hold, and the
+   rule is worth more than the file. The skill writes no layer note and no gotcha: nothing
+   has been built and no gate has been run, and a note about work that has not happened is the
+   same lie as a `done` row in `TRACEABILITY.md`.
 6. Activate the layer, when the target is a git repository:
    `cd <target> && make install-hooks`, which is `git config core.hooksPath .githooks`, the exec
    bits, and `scripts/lock-guard.py --relock`: every existing file the manifest calls
