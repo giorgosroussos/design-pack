@@ -91,8 +91,8 @@ P = {
     "STACK_SCAFFOLD_BULLET": "Create the single service application and its test harness as `02` §1 lays them out.",
     # The two derived lines are what `--task all` prints for this fixture; `Contract change`
     # is the judgement Stage B records (FND-01 defines the command contract, FND-02 does not).
-    "FND01_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: yes",
-    "FND02_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: no",
+    "FND01_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: yes\n- File surface: app, tests, migrations, Makefile\n- Lane: service and migrations",
+    "FND02_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: no\n- File surface: .gitlab-ci.yml, scripts\n- Lane: tests and infrastructure",
     "STACK_LINE": "one Python service, PostgreSQL, no web UI in MVP.",
     "ONE_LINE": "A single-user bookkeeping notebook: entries in, monthly totals out. Not an accounting system, not multi-user.",
     # PLAN.md
@@ -175,6 +175,8 @@ P = {
         "- Surfaces: security",
         "- Touches red line: yes",
         "- Contract change: yes",
+        "- File surface: app/notebooks, migrations, tests/notebooks",
+        "- Lane: service and migrations",
         "",
         "`LDG-02` Monthly totals",
         "",
@@ -182,6 +184,8 @@ P = {
         "- Surfaces: —",
         "- Touches red line: yes",
         "- Contract change: no",
+        "- File surface: app/totals, tests/totals",
+        "- Lane: service and migrations",
         "",
         "### Exit criteria",
         "",
@@ -643,6 +647,25 @@ if [ -n "$HAVE_MAKE" ]; then
     fi
 else
     report ok "10d (skipped: make is not installed)" ""
+fi
+
+# --- 12. every package of the rendered pack is bounded and scheduled ------------
+
+missing=""
+for pkg in FND-01 FND-02 LDG-01 LDG-02; do
+    block="$(awk -v p="\`$pkg\`" 'index($0, p)==1 {f=1} f && /^- Lane: /{print; f=0}' specs/07-implementation-plan.md)"
+    [ -n "$block" ] || missing="$missing $pkg"
+done
+if [ -z "$missing" ] && grep -q '^- File surface: ' specs/07-implementation-plan.md; then
+    report ok "12 every work package of the rendered plan carries a File surface and a Lane" ""
+else
+    report no "12 the two new characteristics" "packages without a Lane:$missing"
+fi
+
+if python3 scripts/check-docs.py --task all | grep -q 'Lane: service and migrations'; then
+    report ok "12b --task all prints the lane and the file surface beside the other three" ""
+else
+    report no "12b --task all" "$(python3 scripts/check-docs.py --task all | head -2)"
 fi
 
 # --- 11. the prompts say where a session stops and where a review runs ----------

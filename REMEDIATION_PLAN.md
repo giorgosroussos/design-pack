@@ -50,7 +50,7 @@ bash design-pack/scripts/test-stage-detect.sh
 | W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | done |
 | W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
-| W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | in progress |
+| W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | done |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -670,7 +670,7 @@ Acceptance:
 
 ## W10 — What a session must read grows without bound, and the knowledge a run buys has no home
 
-Status: in progress (W10.1–W10.4 and W10.6 done; W10.5 not started)
+Status: done
 Decision: the two owner questions were decided on 2026-09-22 — **the owner accepted both
 recommendations as written** (Q-W10.1: a layer note for every `done` package; Q-W10.5: the two
 new characteristics live in the implementation plan). The rest are fixes.
@@ -980,11 +980,16 @@ beside the other three, the freeze hard-locks them with the rest of `specs/`, an
 a `make unlock` with its reason in `UNLOCKS.md`. Estimate: ½ day.
 
 Acceptance:
-- [ ] a package missing `File surface:` or `Lane:` fails `task-policy`; a malformed lane name
-      (one the plan's lane list does not define) fails.
-- [ ] `--task all` reports overlapping file surfaces within a lane and exits zero.
-- [ ] `--brief` prints both fields.
-- [ ] `test-render.sh` proves a rendered pack carries them on every Phase 0 package.
+- [x] a package missing `File surface:` or `Lane:` fails `task-policy`, and the message says what
+      the field is for rather than repeating the prompt-selection sentence, which is not what
+      these two are read by *(case 12)*; a lane the plan's list does not define fails, listing
+      the lanes it does *(12b)*.
+- [x] `--task all` reports overlapping file surfaces within a lane and exits zero *(12e)*; the
+      gate reports the same overlap and never fails on it *(12f)*.
+- [x] `--brief` prints both fields *(12g)* — which is the moment the playbook's "files it may
+      change" reaches an agent rather than staying a requirement in §2.
+- [x] `test-render.sh` proves a rendered pack carries them on **every** package, Phase 0 and
+      domain alike, and that `--task all` prints them *(12, 12b)*.
 
 ### W10.6 — What a run learns about the tooling has no home either
 
@@ -1452,3 +1457,27 @@ Append-only. One entry per session per item touched. Form:
 - Left open: nothing in these two. The ceilings are deliberately not retroactive tooling: an
   existing pack over either one fails the gate on its next run, which is the point — the cell is
   split or the history moves to the layer note the same session.
+
+### 2026-09-22 — W10.5 — done; W10 closed
+- Changed: `templates/scripts/check-docs.py` — `TASK_FIELDS` gains `File surface` and `Lane`,
+  both judgements checked for presence and never recomputed; `plan_lanes()` reads the lane names
+  from the plan's own parallelization section (a bullet's name is the text before a dash or a
+  parenthesis, so a lane may explain itself without renaming itself) and `task-policy` holds
+  `Lane:` to that list; `report_lane_overlaps()` reports, through `note()`, any pair sharing a
+  lane and a path, from both the gate and `--task all`; `report_tasks` prints both fields and
+  `--brief` carries them. `templates/specs/implementation-plan.md` defines them in its notes and
+  makes the parallelization section normative rather than advisory (`[input]`); `stages/B-specify.md`
+  B5.1 records all three judgements in one `decision-added` event and adds the only size rule the
+  plan has ever had: **a package whose file surface spans more than one lane is split at the seam
+  the lanes already name, or explained in that same decision**, with the reason it is a sentence
+  and not an assertion. Docs: `DOCUMENTATION.md` §1, the gates table, the suite table.
+- Proved by: eight suites green — 26 + 17 + 34 + 31 + 36 + 2 + 11 + 29 = 186 cases, up from 177.
+  `test-task-policy.sh` +7 (a missing file surface, with the message naming what the field is
+  for; a lane the plan does not list, with the lanes it does; the five fields passing together;
+  a file surface the rule refuses to second-guess; the overlap reported by `--task all` and by
+  the gate, failing neither; both fields in the brief). `test-render.sh` +2 (every package of the
+  rendered plan carries both, and `--task all` prints them).
+- Left open: nothing. W10 is closed. The two fields are the only part of W10 that reduces elapsed
+  time rather than tokens, and they do it by making a schedule possible, not by making one: which
+  two packages actually run at once is the orchestrator's call, and the pack now gives it the
+  data to make that call instead of a paragraph of advice.

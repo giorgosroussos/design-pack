@@ -119,11 +119,21 @@ Mechanical pass after every round:
      they are never judged and never written from memory; `AGENTS.md` does not exist yet, so
      `Touches red line` reads `no` for every package and Stage C recomputes it once the red lines
      are compiled.
-   - Set `Contract change:` per package yourself: `yes` when the package defines or modifies an
-     interface, API or schema contract, else `no`. This one is an implementation judgement, not a
-     surface question, so it is recorded rather than asked: append one `decision-added` event
-     (type `implementation`) naming the packages that are `yes` and why, with the packages weighed
-     and rejected as its alternatives, and rebuild the projection.
+   - Set `Contract change:`, `File surface:` and `Lane:` per package yourself. `Contract change`
+     is `yes` when the package defines or modifies an interface, API or schema contract, else
+     `no`. `File surface` is the directories or modules the package may change, as the
+     architecture spec's layout spells them. `Lane` is one of the lanes the plan's parallelization
+     section lists, verbatim. All three are implementation judgements, not surface questions, so
+     they are recorded rather than asked: append one `decision-added` event (type
+     `implementation`) naming the packages that are `yes`, the lane assignment and why, with the
+     alternatives weighed, and rebuild the projection.
+   - **A package whose file surface spans more than one lane is a package to split**, at the seam
+     the lanes already name, or to explain in that same decision. This is the only place the plan
+     has a size at all: a package nobody can bound is a session nobody can finish, and the
+     exemplar's own plan carried packages three subsystems wide with nothing to notice it. How
+     wide is too wide is a judgement about the product, so it is a sentence here and not an
+     assertion; what the gate holds is that the fields exist and that the lane is one the plan
+     defines.
    - Re-run `--task all` and check each line against the package; `check-docs`'s `task-policy`
      rule fails the build on any disagreement, so a value copied wrong does not survive Stage C. For every Open card whose `Blocks:` still names a
    `Phase N` — a card the owner deferred in Stage A, before packages existed — append a

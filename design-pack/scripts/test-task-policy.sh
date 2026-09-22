@@ -99,6 +99,8 @@ EOF
 - Surfaces: security
 - Touches red line: yes
 - Contract change: no
+- File surface: app/access, tests/access
+- Lane: service
 
 `PKG-02` Totals
 
@@ -106,12 +108,23 @@ EOF
 - Surfaces: —
 - Touches red line: no
 - Contract change: yes
+- File surface: app/totals, tests/totals
+- Lane: service
 
 `PKG-03` Keeper access on one line — `01` §2.
 
 - Surfaces: security
 - Touches red line: yes
 - Contract change: no
+- File surface: docs
+- Lane: tests and infrastructure
+
+## 5. Safe parallelization
+
+Suggested maximum lanes:
+
+- service
+- tests and infrastructure
 EOF
 
     cat > AGENTS.md <<'EOF'
@@ -337,6 +350,68 @@ elif grep -q 'perf is not a surface' "$work/10.out"; then
     report ok "10 a surface outside the five fails, naming it" ""
 else
     report no "10 unknown surface" "$(cat "$work/10.out")"
+fi
+
+# --- 12: the file surface and the lane, judged and held to the plan's own list --
+
+fixture
+sed -i '/^- File surface: app\/access, tests\/access$/d' specs/03-implementation-plan.md
+if rule > "$work/12.out" 2>&1; then
+    report no "12 a package with no File surface" "no failure reported"
+elif grep -q "PKG-01 states no \`File surface:\`" "$work/12.out" \
+     && grep -q 'playbook' "$work/12.out"; then
+    report ok "12 a package without its file surface fails, saying what the field is for" ""
+else
+    report no "12 missing file surface" "$(cat "$work/12.out")"
+fi
+
+fixture
+sed -i 's/^- Lane: service$/- Lane: whichever is free/' specs/03-implementation-plan.md
+if rule > "$work/12b.out" 2>&1; then
+    report no "12b a lane the plan does not list" "no failure reported"
+elif grep -q "PKG-01 has \`Lane: whichever is free\`" "$work/12b.out" \
+     && grep -q 'the lanes are service, tests and infrastructure' "$work/12b.out"; then
+    report ok "12b a lane the plan does not define fails, listing the lanes it does" ""
+else
+    report no "12b unknown lane" "$(cat "$work/12b.out")"
+fi
+
+fixture
+if rule > "$work/12c.out" 2>&1; then
+    report ok "12c the fixture's five characteristics pass, lanes included" ""
+else
+    report no "12c the five fields" "$(cat "$work/12c.out")"
+fi
+
+# The judgement is not recomputed: any surface the author writes is accepted.
+sed -i 's|^- File surface: app/totals, tests/totals$|- File surface: everything, frankly|' specs/03-implementation-plan.md
+if rule > "$work/12d.out" 2>&1; then
+    report ok "12d the file surface is a judgement: the rule never recomputes or second-guesses it" ""
+else
+    report no "12d judgement not recomputed" "$(cat "$work/12d.out")"
+fi
+
+# Two packages in one lane touching one path are not two lanes: reported, not failed.
+fixture
+sed -i 's|^- File surface: app/totals, tests/totals$|- File surface: app/access, tests/totals|' specs/03-implementation-plan.md
+out="$(python3 scripts/check-docs.py --task all 2>&1)"
+if printf '%s' "$out" | grep -q "PKG-01 and PKG-02 share lane 'service' and the path(s) app/access"; then
+    report ok "12e --task all reports two packages sharing a lane and a path" ""
+else
+    report no "12e overlap report" "$out"
+fi
+if rule > "$work/12f.out" 2>&1; then
+    report ok "12f the same overlap is reported by the gate and never failed on" ""
+else
+    report no "12f overlap not a failure" "$(cat "$work/12f.out")"
+fi
+
+fixture
+out="$(python3 scripts/check-docs.py --brief PKG-01 2>&1)"
+if printf '%s' "$out" | grep -q 'Lane: service' && printf '%s' "$out" | grep -q 'File surface: app/access, tests/access'; then
+    report ok "12g --brief carries the file surface and the lane: the packet's allowed scope" ""
+else
+    report no "12g brief fields" "$(printf '%s' "$out" | head -8)"
 fi
 
 # --- 11: --brief selects the pack, in order, and never writes -------------------

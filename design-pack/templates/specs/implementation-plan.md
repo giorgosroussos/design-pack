@@ -6,8 +6,9 @@ remaining packages contiguous (FND-01, FND-02, FND-03).
 Domain phases: one section per phase, in dependency order, each with Goal, Work packages
 (stable IDs `AAA-NN`, three-letter prefix per phase, bullets = outcomes, not tasks) and Exit
 criteria that a test or a command can demonstrate. Every package gets a TRACEABILITY.md row.
-Every package ALSO ends with its three characteristics, one per line, which the prompt-selection
-table in AGENTS.md reads:
+Every package ALSO ends with its five characteristics, one per line. The first three are what the
+prompt-selection table in AGENTS.md reads; the last two are what a plan needs in order to be split
+at Stage B and scheduled in lanes afterwards:
   - Surfaces:            the surfaces the sections this package cites resolve to, in the order
                          data, security, scope, external, ux; an empty set is written as a dash.
                          DERIVED, never judged: a `[Q-NNN]` statement contributes its card's
@@ -18,10 +19,23 @@ table in AGENTS.md reads:
                          define or modify an interface, API or schema contract), recorded like any
                          other implementation call. `check-docs` checks it is there and boolean;
                          it never recomputes it.
-Do not write them by hand: `python3 scripts/check-docs.py --task all` prints the derived pair for
-every package, and the `task-policy` rule fails the build when a stored value and the pack
-disagree. There is no fourth field: `blocked-by` is read from QUESTIONS.md at run time, so a card
-can be resolved without unlocking this file.
+  - File surface:        the directories or modules this package may change, comma-separated, as
+                         the repository layout spells them (`apps/api/app/Domain/Access, apps/api/tests`).
+                         A JUDGEMENT, like Contract change: `check-docs` checks it is there and
+                         never recomputes it, because only the plan author knows what the package
+                         will touch. It is what the playbook's task packet means by "files it may
+                         change", and what tells an orchestrator whether two packages can run at
+                         once. A package whose surface spans more than one lane is a package Stage
+                         B splits, or explains.
+  - Lane:                one of the lanes this plan's Safe parallelization section lists, verbatim.
+                         A JUDGEMENT checked against that list: a lane nobody defined is a package
+                         nobody can schedule. `--task all` reports packages that share a lane and
+                         a path, because two of those are not two lanes.
+Do not write the first two by hand: `python3 scripts/check-docs.py --task all` prints the derived
+pair for every package, and the `task-policy` rule fails the build when a stored value and the
+pack disagree. The last three are written by the plan author and never recomputed. There is no
+sixth field: `blocked-by` is read from QUESTIONS.md at run time, so a card can be resolved without
+unlocking this file.
 Placeholders:
   {{FND01_CHARACTERISTICS}} {{FND02_CHARACTERISTICS}} {{FND03_CHARACTERISTICS}} {{FND04_CHARACTERISTICS}}
                            the three lines for each Phase 0 package (FND-03/FND-04 only when their
@@ -103,6 +117,8 @@ A fresh clone boots locally through `make clean-start`; CI is green on the remot
 ## {{N_PARALLEL}}. Safe parallelization
 
 After a phase's shared model and contracts are merged, agents may work concurrently on low-overlap packages. Never parallelize migrations for the same aggregate, or concurrent edits to central policies or the contract root, without explicit ownership.
+
+Every work package names one of the lanes below and the file surface it may change, so this section is schedulable rather than advisory: two packages in different lanes run beside each other, and `python3 scripts/check-docs.py --task all` reports any pair that shares a lane and a path. [input]
 
 Suggested maximum lanes:
 

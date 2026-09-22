@@ -90,8 +90,10 @@ Rules
   agents-size   AGENTS.md stays under its byte ceiling
   markers       no unrendered `{{...}}` placeholder or `TBD` remains in the
                 documents or in the root Makefile
-  task-policy   every work package states `Surfaces:`, `Touches red line:` and
-                `Contract change:`; the two derived ones equal what the pack
+  task-policy   every work package states `Surfaces:`, `Touches red line:`,
+                `Contract change:`, `File surface:` and `Lane:`, the last two
+                judgements like the third, checked for presence and for a lane
+                the plan's own list defines; the two derived ones equal what the pack
                 itself says (the surfaces of the cards and register bullets the
                 package's cited sections resolve to, and whether a red line
                 cites a section the package cites); and the prompt-selection
@@ -133,9 +135,10 @@ STATUSES = {"not started", "in progress", "done"}
 DECISION_TYPES = {"implementation", "spec-amendment", "adr"}
 CARD_FIELDS = ["Surface", "Source", "Question", "Options", "Recommendation", "Blocks"]
 SURFACE_ORDER = ["data", "security", "scope", "external", "ux"]
-TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change"]
+TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change", "File surface", "Lane"]
 DERIVED_FIELDS = ["Surfaces", "Touches red line"]
 BOOLEAN_FIELDS = ["Touches red line", "Contract change"]
+LANE_HEADING = "Safe parallelization"
 LIVE_CHARACTERISTIC = "blocked-by"
 POLICY_HEADING = "Prompt selection"
 PROMPT_NAMES = {"1": "Implement", "2": "Review", "3": "Resolve questions"}
@@ -1159,20 +1162,88 @@ def check_policy_table(root):
              % (POLICY_HEADING, ", ".join(missing)))
 
 
+def plan_lanes(root):
+    """The lane names the plan's parallelization section lists, lower case.
+
+    A lane is a bullet under that section; its name is the text before any dash
+    or parenthesis, so a bullet may explain itself without renaming the lane.
+    """
+    plan = spec_by_role(root, "implementation-plan")
+    if not plan:
+        return set()
+    text = strip_fences(read(plan))
+    body = None
+    for m in re.finditer(r"^##\s+\d*\.?\s*(.*)$", text, re.M):
+        if LANE_HEADING.lower() in m.group(1).lower():
+            body = re.split(r"^##\s", text[m.end():], maxsplit=1, flags=re.M)[0]
+            break
+    if body is None:
+        return set()
+    out = set()
+    for line in body.splitlines():
+        bm = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
+        if bm:
+            name = re.split(r"\s+[\u2014-]\s+|\s*\(", bm.group(1))[0].strip().lower()
+            if name:
+                out.add(name)
+    return out
+
+
+def file_surfaces(stored):
+    """The paths a package's `File surface:` names, as a set."""
+    value = (stored.get("File surface") or [""])[0]
+    return set(p.strip().strip("`") for p in value.split(",") if p.strip() and p.strip() != EMPTY)
+
+
+def report_lane_overlaps(root, packages, sink=None):
+    """Packages sharing a lane whose file surfaces intersect.
+
+    Reported and never failed on: two packages in one lane may legitimately touch
+    one directory, and whether that is safe to run concurrently is a judgement
+    about the code. What an orchestrator needs is to be told, not to be stopped.
+    """
+    by_lane = {}
+    for pkg, _, block in packages:
+        stored = stored_characteristics(block)
+        lane = (stored.get("Lane") or [""])[0].strip().lower()
+        if lane:
+            by_lane.setdefault(lane, []).append((pkg, file_surfaces(stored)))
+    for lane in sorted(by_lane):
+        entries = by_lane[lane]
+        for i, (pkg_a, a) in enumerate(entries):
+            for pkg_b, b in entries[i + 1:]:
+                shared = sorted(a & b)
+                if shared:
+                    line = ("%s and %s share lane %r and the path(s) %s; they are not two lanes"
+                            % (pkg_a, pkg_b, lane, ", ".join(shared)))
+                    if sink is None:
+                        note("task-policy", line)
+                    else:
+                        sink.append("note: " + line)
+
+
 def check_task_policy(root, cards):
     derived = derive_characteristics(root, cards)
     plan = spec_by_role(root, "implementation-plan")
     rel = os.path.relpath(plan, root) if plan else SPECS_DIR
     packages = plan_package_blocks(root)
+    lanes = plan_lanes(root)
+    if not lanes and packages:
+        note("task-policy", "%s lists no lanes under %s, so `Lane:` is checked for presence only"
+             % (rel, LANE_HEADING))
     for pkg, ln, block in packages:
         where = "%s:%d" % (rel, ln)
         stored = stored_characteristics(block)
         for field in TASK_FIELDS:
             values = stored.get(field, [])
             if not values:
-                fail("task-policy", where, "%s states no `%s:`; a package without its "
-                     "characteristics cannot be matched against the prompt-selection table "
-                     "in AGENTS.md" % (pkg, field))
+                why = ("cannot be matched against the prompt-selection table in AGENTS.md"
+                       if field in ("Surfaces", "Touches red line", "Contract change")
+                       else "cannot be bounded or scheduled: `File surface:` is what the "
+                            "playbook's task packet hands an agent, and `Lane:` is what says "
+                            "whether two packages may run at once")
+                fail("task-policy", where, "%s states no `%s:`; a package without it %s"
+                     % (pkg, field, why))
             elif len(values) > 1:
                 fail("task-policy", where, "%s states `%s:` %d times; one line, one value"
                      % (pkg, field, len(values)))
@@ -1181,6 +1252,12 @@ def check_task_policy(root, cards):
             if value is not None and value not in ("yes", "no"):
                 fail("task-policy", where, "%s has `%s: %s`; the value is `yes` or `no`"
                      % (pkg, field, value))
+        lane = (stored.get("Lane") or [None])[0]
+        if lane is not None and lanes and lane.strip().lower() not in lanes:
+            fail("task-policy", where, "%s has `Lane: %s`, which `%s` \u00a7%s does not list; "
+                 "the lanes are %s. A lane names a component that can be built beside another, "
+                 "so a lane nobody defined is a package nobody can schedule"
+                 % (pkg, lane, rel, LANE_HEADING, ", ".join(sorted(lanes))))
         surfaces = (stored.get("Surfaces") or [None])[0]
         if surfaces is not None and surfaces != EMPTY:
             unknown = [s for s in [p.strip() for p in surfaces.split(",")] if s not in SURFACES]
@@ -1203,7 +1280,9 @@ def check_task_policy(root, cards):
                 fail("task-policy", where, "%s states `%s: %s`, but the pack derives `%s`: %s. "
                      "This characteristic is derived, not judged: correct the field, or the "
                      "citation that no longer holds" % (pkg, field, value, expected[field], detail))
-    ok("task-policy", "%d work package(s) carry their characteristics" % len(packages))
+    ok("task-policy", "%d work package(s) carry their characteristics, %d lane(s)"
+       % (len(packages), len(lanes)))
+    report_lane_overlaps(root, packages)
     check_policy_table(root)
 
 
@@ -1226,14 +1305,26 @@ def report_tasks(root, cards, selector, sink=None):
             continue
         stored = stored_characteristics(block)
         contract = (stored.get("Contract change") or [EMPTY])[0] or EMPTY
+        lane = (stored.get("Lane") or [EMPTY])[0] or EMPTY
+        surface = (stored.get("File surface") or [EMPTY])[0] or EMPTY
         cards_blocking = blocked_by(cards, pkg)
-        line = ("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %s"
+        line = ("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %-10s "
+                "Lane: %-24s File surface: %s"
                 % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
-                   LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY))
+                   LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY, lane, surface))
         if sink is None:
             print(line)
         else:
             sink.append(line)
+    if selector == "all":
+        # What an orchestrator choosing lanes needs before it starts two at once.
+        overlaps = []
+        report_lane_overlaps(root, plan_package_blocks(root), sink=overlaps)
+        for line in overlaps:
+            if sink is None:
+                print(line)
+            else:
+                sink.append(line)
     return 0
 
 
