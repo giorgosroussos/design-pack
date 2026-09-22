@@ -62,7 +62,8 @@ and waiting for the owner.
    whatever their surface; the index line carries the surface, so the order is still readable. One event per card:
    `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/log-append.py --root <target> --stream questions --type card-opened --payload-file -`
    with the payload on stdin (`id`, `title`, `surface`, `source`, `question`, `options` as a JSON
-   array, `recommendation`, `blocks: specification`) — or, for a whole round, one JSON array of
+   array, `recommendation`, `blocks: specification`; every event's fields are in
+   `reference/events-and-rules.md`, so no script is opened to find one) — or, for a whole round, one JSON array of
    such payloads in a file written to the scratchpad and passed with `--payload-file <file>`:
    every element is validated first and the batch is appended all or nothing. The tool refuses a
    card whose options carry no consequence, whose surface is not one of the five, or that tries

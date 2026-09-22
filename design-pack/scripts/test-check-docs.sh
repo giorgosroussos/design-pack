@@ -423,5 +423,44 @@ else
 fi
 rm -rf docs AGENTS.md
 
+# --- the lookup does not drift from the code it documents ----------------------
+# A reference that goes stale is worse than none: the agent that trusts it stops
+# looking. Both halves are derived from the sources, never from a list here.
+
+ref="$here/reference/events-and-rules.md"
+python3 - "$ref" "$tpl/scripts/check-docs.py" "$tpl/scripts/eventlog.py" > "$work/drift.out" 2>&1 <<'DRIFTEOF'
+import re, sys
+ref, checker, eventlog = (open(p, encoding="utf-8").read() for p in sys.argv[1:4])
+problems = []
+
+# Every rule the checker can name, against every rule the lookup tabulates.
+in_code = set(re.findall(r'(?:fail|ok|note)\("([a-z][a-z-]+)"', checker))
+rules_section = ref.split("## `check-docs`: the rule names", 1)[-1]
+in_ref = set(re.findall(r'^\| `([a-z][a-z-]+)` \|', rules_section, re.M))
+for name in sorted(in_code - in_ref):
+    problems.append("rule %s exists in check-docs.py and is not in the lookup" % name)
+for name in sorted(in_ref - in_code):
+    problems.append("the lookup names rule %s, which check-docs.py does not have" % name)
+
+# Every event type, and the fields eventlog.py requires of it.
+for const in ("DECISION_EVENTS", "CARD_EVENTS"):
+    m = re.search(r"^%s = \(([^)]*)\)" % const, eventlog, re.M | re.S)
+    for event in re.findall(r'"([a-z-]+)"', m.group(1)):
+        if "`%s`" % event not in ref:
+            problems.append("event %s is not in the lookup" % event)
+m = re.search(r'^DECISION_FIELDS = \(([^)]*)\)', eventlog, re.M | re.S)
+for field in re.findall(r'"([a-z_]+)"', m.group(1)):
+    if "`%s`" % field not in ref:
+        problems.append("decision-added requires %s and the lookup does not name it" % field)
+
+print("\n".join(problems) if problems else "no drift")
+sys.exit(1 if problems else 0)
+DRIFTEOF
+if [ $? -eq 0 ]; then
+    report ok "lookup: reference/events-and-rules.md names every rule and every event the code has" ""
+else
+    report no "lookup drift" "$(cat "$work/drift.out")"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

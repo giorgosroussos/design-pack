@@ -64,7 +64,9 @@ Writing rules for every file:
 - `[input]` only for what the inputs say. `[Q-NNN]` for what an answered card says (or the
   recommendation of a deferred card, visibly provisional). `[D-NNN]` for a default from the
   ledger: append its `decision-added` event first (type `implementation`, dated today,
-  alternatives from the ledger) and rebuild the projection, then write the statement. Never add a
+  alternatives from the ledger; its payload fields are in `reference/events-and-rules.md`, which
+  is where every event's fields and every `--only` rule name live) and rebuild the projection,
+  then write the statement. Never add a
   `D-NNN` by editing `DECISIONS.md`; `check-docs` compares that file to the log and fails on any
   difference. `[inferred]` for anything else, temporarily.
 - Nothing not in the inputs or a card is added as MVP. A missing requirement whose absence

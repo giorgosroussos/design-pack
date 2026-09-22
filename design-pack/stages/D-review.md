@@ -35,7 +35,8 @@ and at the freeze. The skill never stamps the baseline on its own initiative.
 ## Round D2 — Mechanical
 
 1. `make check-docs` exit 0, which includes `chain-intact` and `projection-fresh`; `make
-   verify-chain` exit 0 on its own.
+   verify-chain` exit 0 on its own. `reference/events-and-rules.md` names every rule and what it
+   fails on, so a failure is read there rather than in the script.
 2. `check-docs` covers the tags: `normative-tagged` fails on any untagged statement (an
    adopted pack is exempt by its `docs/inputs/README.md` declaration), and `inferred-zero`
    will fail the moment the baseline is stamped if any `[inferred]` remains, so clear them

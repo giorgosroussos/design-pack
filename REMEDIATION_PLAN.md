@@ -624,7 +624,13 @@ Acceptance:
 - The agent reached for `wc -c` and `grep -n` over the skill's scripts to learn field names and
   rule lists it needed (Answer rendering, `--only` rule names, `decision-added` fields). Those are
   inspection commands and prompt in any mode; the stage files could name the rule list and the
-  payload fields once each so the agent does not go looking. ½ hour, not done here.
+  payload fields once each so the agent does not go looking. ½ hour. **Done 2026-09-22:**
+  `reference/events-and-rules.md` carries every event's payload fields and what each renders as,
+  and every `check-docs` rule with what it fails on; `SKILL.md` marks it a lookup rather than a
+  session read; Stages A, B and D point at it where the agent would otherwise open a script. A
+  drift case in `test-check-docs.sh` derives both lists from the code and fails when the lookup
+  and the scripts disagree, because a reference that goes stale is worse than none — the agent
+  that trusts it stops looking.
 
 ---
 
@@ -1481,3 +1487,20 @@ Append-only. One entry per session per item touched. Form:
   time rather than tokens, and they do it by making a schedule possible, not by making one: which
   two packages actually run at once is the orchestrator's call, and the pack now gives it the
   data to make that call instead of a paragraph of advice.
+
+### 2026-09-22 — W8.5 second bullet — done
+- Changed: new `design-pack/reference/events-and-rules.md` — the three payload tables of the
+  `decisions` stream, the six of the `questions` stream, what each event renders as (including
+  the two Answer forms), the `log-append.py` invocation with `--payload-file`, `--set` and the
+  array form, and all 22 `check-docs` rules with what each fails on. `SKILL.md` step 3 marks it a
+  **lookup, not a session read**, and says that a stage which sent an agent into
+  `templates/scripts/` for a field is a defect in that stage; the files table carries it.
+  `stages/A-elicit.md` A1.4, `stages/B-specify.md` B3 and `stages/D-review.md` D2 point at it at
+  the three places the owner's log shows the agent going looking.
+- Proved by: eight suites green — 26 + 17 + 34 + 32 + 36 + 2 + 11 + 29 = 187 cases. The new case
+  is a drift check: it derives the rule names from `(fail|ok|note)("...")` in `check-docs.py` and
+  the event types and required decision fields from `eventlog.py`'s own constants, then compares
+  both against the lookup's tables in each direction. Proved to bite by renaming one rule in the
+  lookup and watching the suite fail with that name, then restoring it.
+- Left open: W8.1's live run, which is the owner's, and the `Decision:` line recording where the
+  permission-grant offer belongs. Nothing else in W8.

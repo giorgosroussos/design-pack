@@ -66,6 +66,9 @@ owner's language.
    `AGENTS.md`, offer only a re-run of the hunter (Stage D round D1) on request, and stop.
 3. Read `reference/surfaces.md`, `reference/decision-card.md` and `reference/provenance.md`
    once per session before any stage work. They are short and they are the core.
+   `reference/events-and-rules.md` is a **lookup, not a session read**: open it when you need a
+   payload field or a rule name, and never read a script to find one. A stage that needed a field
+   and went looking in `templates/scripts/` is a defect in that stage, not in the agent.
 4. An existing spec set the owner adopts as-is enters at `C` once `docs/inputs/README.md`
    declares it authoritative; `stages/C-operationalize.md` §Adopted packs says what changes.
 
@@ -166,6 +169,7 @@ unacceptable state.
 | --- | --- |
 | `reference/surfaces.md`, `decision-card.md`, `provenance.md` | the core mechanisms, read every session |
 | `reference/elicitation-checklist.md` | the sweep Stage A runs so it does not under-elicit; amend it when implementation shows a surface was under-asked |
+| `reference/events-and-rules.md` | looked up, not read every session: every event's payload fields, what each renders as, and the `check-docs` rule names `--only` takes |
 | `stages/A-elicit.md` … `D-review.md` | the rounds of each stage and where they stop |
 | `stages/hunter.md` | prompts for the assumption hunter and the input auditor |
 | `templates/` | near-verbatim and structural templates; each starts with `TEMPLATE NOTES` naming its placeholders |
