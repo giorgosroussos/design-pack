@@ -162,6 +162,10 @@ None yet: no package has been delivered. The first one to reach `done` adds its 
 | 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
 | 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness, and there is no security, isolation or contract dimension for a review to add. |
 
+The table says *whether* prompt 2 runs; `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` says *where*: a
+review runs in a session that did not write the code, because the session that did holds the
+assumptions the review exists to catch.
+
 ## Living documents
 
 All at repository root. When scope changes, update the smallest relevant document. Durable rationale goes to `DECISIONS.md`, incompleteness to `GAPS.md`, unresolved choices to `QUESTIONS.md`; `PLAN.md` never becomes an archive. `make check-docs` fails on the inconsistencies that can be detected mechanically; the rules below are the ones it cannot.

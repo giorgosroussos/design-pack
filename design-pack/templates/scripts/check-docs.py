@@ -42,6 +42,11 @@ Rules
   plan-size     PLAN.md stays under its line ceiling
   gaps          every package or phase a GAPS.md row cites exists in the plan;
                 gap IDs are unique and increasing
+  gaps-size     no cell of a GAPS.md row is longer than its ceiling: a row holds
+                one gap, not the history of the packages that narrowed it
+  evidence-size no Evidence cell of TRACEABILITY.md is longer than its ceiling:
+                it holds the run that proved the current status, and Git holds
+                the rest, because a status change is a commit
   packages      every work package in the implementation plan has exactly one
                 TRACEABILITY.md row, and no row lacks a package
   traceability  status values are from the allowed set; `done` and
@@ -118,6 +123,8 @@ ROOT_DOCS = ["AGENTS.md", "PLAN.md", "DECISIONS.md", "GAPS.md", "QUESTIONS.md",
 SPECS_DIR = "specs"
 PLAN_MAX_LINES = 100
 AGENTS_MAX_BYTES = 20_000
+GAP_CELL_MAX_CHARS = 2_000
+EVIDENCE_MAX_CHARS = 1_000
 LAYERS_DIR = os.path.join("docs", "layers")
 LAYER_HEADINGS = ["What this package established", "What a later slice must not do", "Handoff"]
 LAYER_INDEX_HEADING = "Layer notes"
@@ -160,6 +167,15 @@ def fail(rule, where, msg):
 
 def ok(rule, msg):
     notes.append("ok   %-12s %s" % (rule, msg))
+
+
+def note(rule, msg):
+    """Reported in the run, never a failure.
+
+    For what a rule can see but must not judge: the observation is printed and
+    the exit code is untouched, the same treatment `Contract change` gets.
+    """
+    notes.append("note %-12s %s" % (rule, msg))
 
 
 def read(path):
@@ -389,6 +405,12 @@ def check_packages_and_traceability(root):
             fail("traceability", "TRACEABILITY.md:%d" % ln, "%s status %r is not one of %s" % (p, status, sorted(STATUSES)))
         elif status in ("done", "in progress") and evidence in ("", "—", "-", "–"):
             fail("traceability", "TRACEABILITY.md:%d" % ln, "%s is %s without evidence" % (p, status))
+        if len(evidence) > EVIDENCE_MAX_CHARS:
+            fail("evidence-size", "TRACEABILITY.md:%d" % ln,
+                 "%s has %d characters of evidence, ceiling is %d. The cell holds the run that "
+                 "proved the current status -- commands and test names. Earlier runs are in Git, "
+                 "where a status change is a commit, and what a slice learned is in its layer note."
+                 % (p, len(evidence), EVIDENCE_MAX_CHARS))
     if pkgs:
         ok("packages", "%d work packages, %d rows" % (len(pkgs), len(rows)))
     return pkgs, phases, rows
@@ -441,6 +463,19 @@ def check_gaps(root, pkgs, phases):
         last = gid
         cells = [c.strip() for c in m.group(2).split("|")]
         plan_item = cells[-1] if cells else ""
+        for cell in cells:
+            if len(cell) > GAP_CELL_MAX_CHARS:
+                fail("gaps-size", "GAPS.md:%d" % ln,
+                     "G-%03d has a cell of %d characters, ceiling is %d. A row holds one gap: "
+                     "what is missing, what that costs, what closes it. The story of the "
+                     "packages that narrowed it belongs in their layer notes, and Git holds "
+                     "what the row said before."
+                     % (gid, len(cell), GAP_CELL_MAX_CHARS))
+        named = set(WP_RE.findall(" | ".join(cells[:-1])))
+        if len(named) > 3:
+            note("gaps-size", "GAPS.md:%d: G-%03d names %d work packages (%s); a row that "
+                 "narrates its own history is on its way past the cell ceiling"
+                 % (ln, gid, len(named), ", ".join(sorted(named))))
         expanded = set()
         for pre, a, b in WP_RANGE_RE.findall(plan_item):
             for i in range(int(a), int(b) + 1):

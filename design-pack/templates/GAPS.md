@@ -5,7 +5,7 @@ Truthful-empty: G-001 only, unless the inputs themselves leave a gap the owner c
 -->
 # GAPS
 
-Deliberate incompleteness and missing infrastructure. A gap is closed only by evidence, never by a stub. Each row names the evidence that closes it and the plan item that produces it. IDs are never reused: a closed gap's row is removed and its ID retired. `make check-docs` verifies that every cited work package and phase exists.
+Deliberate incompleteness and missing infrastructure. A gap is closed only by evidence, never by a stub. Each row names the evidence that closes it and the plan item that produces it. IDs are never reused: a closed gap's row is removed and its ID retired. `make check-docs` verifies that every cited work package and phase exists, and that no cell exceeds 2000 characters (`gaps-size`): a row holds one gap — what is missing, what that costs, what closes it — and never the story of the packages that narrowed it. That story is each package's layer note, and what the row said before is in Git.
 
 | ID | Gap | Consequence | Evidence to close | Plan item |
 | --- | --- | --- | --- | --- |

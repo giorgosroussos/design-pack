@@ -670,7 +670,7 @@ Acceptance:
 
 ## W10 — What a session must read grows without bound, and the knowledge a run buys has no home
 
-Status: in progress (W10.1, W10.2 and W10.6 done; W10.3–W10.5 not started)
+Status: in progress (W10.1–W10.4 and W10.6 done; W10.5 not started)
 Decision: the two owner questions were decided on 2026-09-22 — **the owner accepted both
 recommendations as written** (Q-W10.1: a layer note for every `done` package; Q-W10.5: the two
 new characteristics live in the implementation plan). The rest are fixes.
@@ -890,10 +890,14 @@ Fix. Files: `design-pack/templates/scripts/check-docs.py`, `design-pack/template
 Estimate: ½ day.
 
 Acceptance:
-- [ ] a 3 KB Gap cell fails `gaps-size`; splitting it into two rows passes.
-- [ ] a 2 KB Evidence cell fails `evidence-size`; the same row with the latest run only passes.
-- [ ] the summary reports the package count per gap row and never fails on it.
-- [ ] `test-render.sh` unaffected (the rendered pack has one gap row and empty evidence).
+- [x] a 3 KB Gap cell fails `gaps-size`, naming its length; a row that states one gap passes.
+- [x] a 2 KB Evidence cell fails `evidence-size`; the same row with the latest run only passes.
+- [x] the run reports the package count per gap row and never fails on it — a new `note()`
+      helper beside `fail()` and `ok()`, so "reported, not enforced" has a shape in the checker
+      rather than being a comment in a rule.
+- [x] `test-render.sh` unaffected, and it now also asserts that `GAPS.md` and `TRACEABILITY.md`
+      state their own ceilings and why (case 11c): a ceiling only in the checker is a surprise,
+      and the document that has to live inside it should say so.
 
 ### W10.4 — Prompt 1 has no end other than success, and prompt 2 reviews the session that wrote the code
 
@@ -927,8 +931,10 @@ Estimate: 1 hour. No new rule: this is prose about how a session is run, and the
 here a snapshot of the repository can assert. `test-render.sh` greps for both sentences.
 
 Acceptance:
-- [ ] both sentences present in a rendered pack (grep in `test-render.sh`).
-- [ ] the prompt-selection table's note says where prompt 2 runs, not only whether.
+- [x] both sentences present in a rendered pack (cases 11, 11b).
+- [x] the prompt-selection table's note says where prompt 2 runs, not only whether. Prompt 2 also
+      opens on `make brief` and the slice's layer note instead of on `AGENTS.md` and a
+      traceability row, which is the same economy as prompt 1's.
 
 ### W10.5 — A package has no size and no lane, so the plan cannot be split or parallelised (**owner**)
 
@@ -1421,3 +1427,28 @@ Append-only. One entry per session per item touched. Form:
   neighbouring packages included, which is correct selection and not a defect — the citation is
   what the plan wrote; and the brief resolves nothing *inside* a decision entry, because the
   entry is a projection of the log and its text is history.
+
+### 2026-09-22 — W10.3 + W10.4 — done
+- Changed: **W10.3** `templates/scripts/check-docs.py` gains `gaps-size` (2000 characters per
+  `GAPS.md` cell) and `evidence-size` (1000 per Evidence cell), both calibrated on the exemplar —
+  its good rows are 1.0–1.4 KB and read as one gap, its failures an order of magnitude past that —
+  plus a `note()` helper for what a rule may see and must not judge, used to report a gap row
+  naming more than three packages. `templates/GAPS.md` and `templates/TRACEABILITY.md` state
+  their own ceiling and the reason: a row holds one gap, an Evidence cell holds the run that
+  proved the **current** status, and Git holds what came before because a status change is a
+  commit. **W10.4** prompt 1 gains a second exit at the session's budget — stop at a boundary you
+  choose, do not begin a sub-task you cannot finish and record, leave the documents truthful,
+  write the note, name the next step — and prompt 2 gains the sentence that it runs in a session
+  that did not write the code, on Stage D's own argument, opening on `make brief` and the slice's
+  layer note rather than on `AGENTS.md` and a row. `templates/AGENTS.md`'s policy table says
+  *where* a review runs beside *whether*; the playbook §10 carries the unfinished-slice rule.
+  Docs: `DOCUMENTATION.md` gates and suite tables.
+- Proved by: eight suites green — 26 + 17 + 34 + 31 + 34 + 2 + 11 + 22 = 177 cases, up from 169.
+  `test-check-docs.sh` +5 (a Gap cell past the ceiling failing with its length; an ordinary row
+  passing; a row naming four packages reported with zero failures; an Evidence cell past the
+  ceiling; the run that proved the current status passing). `test-render.sh` +3 (the budget
+  clause, the fresh-session rule in both the prompt and the table, and the two registers
+  declaring their own ceilings).
+- Left open: nothing in these two. The ceilings are deliberately not retroactive tooling: an
+  existing pack over either one fails the gate on its next run, which is the point — the cell is
+  split or the history moves to the layer note the same session.

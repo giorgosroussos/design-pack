@@ -8,7 +8,7 @@ Placeholders: {{NN_PLAN}} {{NN_TESTING}} {{NN_TRACE}} {{JOURNEYS_SECTION_REF}} (
 -->
 # TRACEABILITY
 
-Implementation status and evidence per work package (`specs/{{NN_PLAN}}-implementation-plan.md`) and per critical journey (`specs/{{NN_TESTING}}-testing-acceptance.md` {{JOURNEYS_SECTION_REF}}). Status values: `not started`, `in progress`, `done`. Status is set only from evidence that ran and passed; never from plans, file presence or stubs. `make check-docs` verifies that every package has exactly one row and that `done` rows carry evidence. The product-intent scope matrix is `specs/{{NN_TRACE}}-traceability.md`.
+Implementation status and evidence per work package (`specs/{{NN_PLAN}}-implementation-plan.md`) and per critical journey (`specs/{{NN_TESTING}}-testing-acceptance.md` {{JOURNEYS_SECTION_REF}}). Status values: `not started`, `in progress`, `done`. Status is set only from evidence that ran and passed; never from plans, file presence or stubs. `make check-docs` verifies that every package has exactly one row, that `done` rows carry evidence, and that no Evidence cell exceeds 1000 characters (`evidence-size`): the cell holds the run that proved the **current** status — commands and test names — because a status change is a commit and Git holds the earlier ones. What a slice learned on the way belongs in its layer note (`docs/layers/`). The product-intent scope matrix is `specs/{{NN_TRACE}}-traceability.md`.
 
 ## Work packages
 

@@ -645,5 +645,28 @@ else
     report ok "10d (skipped: make is not installed)" ""
 fi
 
+# --- 11. the prompts say where a session stops and where a review runs ----------
+
+if grep -q "until this session's budget is reached" SESSION_BOOTSTRAP_PROMPT_SAMPLE.md \
+   && grep -q 'stop at a boundary you choose' SESSION_BOOTSTRAP_PROMPT_SAMPLE.md; then
+    report ok "11 prompt 1 has a second exit: the budget, at a boundary the session chooses" ""
+else
+    report no "11 the budget clause" "prompt 1 still ends only on success"
+fi
+
+if grep -q 'fresh session\*\*, never in the one that implemented' SESSION_BOOTSTRAP_PROMPT_SAMPLE.md \
+   && grep -q 'review runs in a session that did not write the code' AGENTS.md; then
+    report ok "11b prompt 2 runs in a session that did not write the code, and the table says so" ""
+else
+    report no "11b the fresh-session rule" "the prompt or the table does not say where a review runs"
+fi
+
+# The ceilings are declared where the documents themselves are, not only in the checker.
+if grep -q 'gaps-size' GAPS.md && grep -q 'evidence-size' TRACEABILITY.md; then
+    report ok "11c GAPS.md and TRACEABILITY.md state their own ceilings and why" ""
+else
+    report no "11c the declared ceilings" "a template does not name its rule"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

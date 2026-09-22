@@ -277,6 +277,72 @@ else
 fi
 rm -rf specs
 
+# --- gaps-size and evidence-size: a register row is not a chronicle ------------
+
+mkdir -p specs
+cat > specs/03-implementation-plan.md <<'PLANEOF'
+# Implementation Plan
+
+## 3. Phase 0 — Foundations
+
+### Work packages
+
+`PKG-01` One
+
+- Surfaces: —
+PLANEOF
+long="$(python3 -c "print('narrative about how three packages narrowed this gap. ' * 50)")"
+printf '# GAPS\n\n| ID | Gap | Consequence | Evidence to close | Plan item |\n| --- | --- | --- | --- | --- |\n| G-001 | %s | It costs. | A test. | PKG-01 |\n' "$long" > GAPS.md
+if probe 'cd.check_gaps(root, {"PKG-01"}, {"0"})' > "$work/g1.out" 2>&1; then
+    report no "gaps-size: an oversized Gap cell" "not reported"
+elif grep -q 'FAIL gaps-size .*GAPS.md:5: G-001 has a cell of [0-9]* characters' "$work/g1.out"; then
+    report ok "gaps-size: a Gap cell past the ceiling fails, naming the length" ""
+else
+    report no "gaps-size: oversized cell" "$(cat "$work/g1.out")"
+fi
+
+printf '# GAPS\n\n| ID | Gap | Consequence | Evidence to close | Plan item |\n| --- | --- | --- | --- | --- |\n| G-001 | Nothing checks ownership. | Anyone reads anything. | A test naming the refusal. | PKG-01 |\n' > GAPS.md
+if probe 'cd.check_gaps(root, {"PKG-01"}, {"0"})' > "$work/g2.out" 2>&1; then
+    report ok "gaps-size: a row that states one gap passes" ""
+else
+    report no "gaps-size: normal row" "$(cat "$work/g2.out")"
+fi
+
+printf '# GAPS\n\n| ID | Gap | Consequence | Evidence to close | Plan item |\n| --- | --- | --- | --- | --- |\n| G-001 | PKG-01 narrowed it, PKG-02 narrowed it, PKG-03 narrowed it and PKG-04 rewrote it. | It costs. | A test. | PKG-01 |\n' > GAPS.md
+out="$(python3 - <<'PROBE2'
+import importlib.util, os
+spec = importlib.util.spec_from_file_location("checkdocs", "scripts/check-docs.py")
+cd = importlib.util.module_from_spec(spec); spec.loader.exec_module(cd)
+cd.check_gaps(os.path.abspath("."), {"PKG-01", "PKG-02", "PKG-03", "PKG-04"}, {"0"})
+print("\n".join(cd.notes)); print("FAILURES:", len(cd.failures))
+PROBE2
+)"
+if printf '%s' "$out" | grep -q 'note gaps-size .*names 4 work packages' && printf '%s' "$out" | grep -q 'FAILURES: 0'; then
+    report ok "gaps-size: a row naming four packages is reported and never failed on" ""
+else
+    report no "gaps-size: the report" "$out"
+fi
+rm -f GAPS.md
+
+long_ev="$(python3 -c "print('2026-09-01: the suite passed; 2026-09-02: it passed again. ' * 20, end='')")"
+printf '# TRACEABILITY\n\n| Package | Phase | Outcome | Key specs | Status | Evidence |\n| --- | --- | --- | --- | --- | --- |\n| PKG-01 | 0 | One | `01` §1 | done | %s |\n' "$long_ev" > TRACEABILITY.md
+if probe 'cd.check_packages_and_traceability(root)' > "$work/e1.out" 2>&1; then
+    report no "evidence-size: an oversized Evidence cell" "not reported"
+elif grep -q 'FAIL evidence-size .*TRACEABILITY.md:5: PKG-01 has [0-9]* characters of evidence' "$work/e1.out"; then
+    report ok "evidence-size: an Evidence cell past the ceiling fails, naming the length" ""
+else
+    report no "evidence-size: oversized cell" "$(cat "$work/e1.out")"
+fi
+
+printf '# TRACEABILITY\n\n| Package | Phase | Outcome | Key specs | Status | Evidence |\n| --- | --- | --- | --- | --- | --- |\n| PKG-01 | 0 | One | `01` §1 | done | 2026-09-22: `make verify` exit 0; OwnershipTest, TotalsTest. |\n' > TRACEABILITY.md
+if probe 'cd.check_packages_and_traceability(root)' > "$work/e2.out" 2>&1; then
+    report ok "evidence-size: the run that proved the current status passes" ""
+else
+    report no "evidence-size: normal evidence" "$(cat "$work/e2.out")"
+fi
+rm -f TRACEABILITY.md
+rm -rf specs
+
 # --- layer-notes: the note exists for what is done, the index never holds one --
 
 mkdir -p docs/layers
@@ -325,7 +391,7 @@ fi
 cp "$tpl/docs-layers-README.md" docs/layers/README.md
 printf 'x\n' > docs/layers/_SCRATCH.md
 if probe "cd.check_layer_notes(root, $pkgs, $rows)" > "$work/l5.out" 2>&1; then
-    report ok "layer-notes: the shipped README and a `_`-prefixed file are not read as notes" ""
+    report ok "layer-notes: the shipped README and an underscore-prefixed file are not read as notes" ""
 else
     report no "layer-notes: shipped files" "$(cat "$work/l5.out")"
 fi

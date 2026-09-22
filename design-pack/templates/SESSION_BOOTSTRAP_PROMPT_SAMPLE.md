@@ -55,7 +55,12 @@ an approved ADR. Never invent requirements, weaken tests, or mark work done from
 Continue until every acceptance condition of the `Now` item is demonstrably satisfied,
 `make verify` passes from a documented starting state, `make check-docs` passes, PLAN.md
 accurately describes the remaining work with the completed item removed, and no blocker is
-concealed. If a specification ambiguity materially changes data, security, scope, external
+concealed — **or until this session's budget is reached**, whichever comes first. If it is the
+budget: stop at a boundary you choose rather than at the one the context runs out at. Do not
+begin a sub-task you cannot finish and record. Leave PLAN.md, GAPS.md and TRACEABILITY.md
+truthful about what actually runs and passes, write the layer note with its handoff, and name
+the next step precisely enough that the next session starts from `make brief` and this note
+rather than from a reconstruction. If a specification ambiguity materially changes data, security, scope, external
 commitments or UX, write it as a card in QUESTIONS.md and pause only if proceeding would make
 a costly or irreversible assumption. Otherwise state the assumption, tag it, and continue.
 
@@ -68,11 +73,16 @@ Do not commit unless asked. Commit messages carry no AI attribution.
 
 ## 2. Review pass on a finished slice
 
+Run this in a **fresh session**, never in the one that implemented the slice. The session that
+wrote the code holds every assumption the review exists to catch, and it holds them as context
+rather than as claims it can see. This is the same reason the design phase gives a specification
+to a reader with no memory of the conversation that produced it.
+
 ```text
 Run a bounded review of the last completed slice ([TASK-ID]) as described in AGENTS.md and
 specs/{{NN_PLAYBOOK}}-agent-playbook.md §7. Do not redesign or refactor unrelated code.
 
-Read AGENTS.md, the TRACEABILITY.md row for the slice, and the spec sections it cites. Then
+Read `make brief TASK=[TASK-ID]`, the slice's layer note and its diff. Then
 review in four separate passes and report findings with file evidence and severity:
 1. correctness against the spec sections and state invariants;
 2. security and isolation: {{REVIEW_PASS_2}};
