@@ -70,12 +70,17 @@ This file is the entry point for every human or GenAI agent working in this repo
 
 **Session reading order:**
 
-1. `AGENTS.md`, then `PLAN.md`.
-2. `QUESTIONS.md` (Blocking and Open), `GAPS.md`, `TRACEABILITY.md`, and in `DECISIONS.md` the index plus the entries the active `PLAN.md` item cites. Read the whole of `DECISIONS.md` only when working on cross-cutting architecture.
-3. The layer note of every package the active item names as a dependency (`docs/layers/<PACKAGE>.md`, indexed below), and no others.
-4. `specs/README.md` and `specs/{{NN_REGISTER}}-decision-register.md`, then the spec files cited by the active `PLAN.md` item. Read all specs before changing cross-cutting architecture, {{ISOLATION_TERM}}, authorization, the contract root or shared migrations.
-5. `docs/inputs/README.md` when a task cites a raw requirement or a non-authoritative input.
-6. `docs/gotchas.md` before running the gates for the first time in a session.
+1. `AGENTS.md`, then `make brief TASK=<PACKAGE>` for the package you are about to work on. The brief is not a summary of the pack: it is the pack, selected by what the package cites — its characteristics, the `Now` item, its block in the plan, the cards blocking it, the text of every spec section it cites, the decisions those cite, the layer notes of the packages it names, its `TRACEABILITY.md` row and the `GAPS.md` rows naming it. Which parts are relevant is a derivation over citations, not a judgement, which is why a command makes it and not you.
+2. `specs/README.md` and `specs/{{NN_REGISTER}}-decision-register.md`: short, and they govern everything the brief contains.
+3. `docs/gotchas.md` before running the gates for the first time in a session.
+4. The source tree the package touches. This is where the session's reading budget belongs.
+
+Read a document **whole** only for the reasons below; each one is a case where a citation cannot tell you what you need.
+
+- All of `specs/` before changing cross-cutting architecture, {{ISOLATION_TERM}}, authorization, the contract root or shared migrations.
+- All of `DECISIONS.md` (its index first) when the change is cross-cutting; otherwise the brief already carries the entries the work cites.
+- `QUESTIONS.md` when a card's answer is in doubt; the brief carries the ones that block this package, and `PLAN.md` and `GAPS.md` in full when correcting them.
+- `docs/inputs/README.md` when a task cites a raw requirement or a non-authoritative input.
 
 ## Non-negotiable constraints
 
@@ -122,6 +127,7 @@ make rebuild-decisions  # render DECISIONS.md from the event log
 make rebuild-questions  # render QUESTIONS.md from the event log
 make install-hooks  # point git at .githooks/ (once per clone)
 make unlock         # ceremonial unlock of one hard-locked path: PATH=<path> REASON="why"
+make brief          # everything a session on one package must read: brief TASK=<PACKAGE>
 make clean-start    # fresh isolated environment: setup, infra-up, migrate, verify, smoke, teardown
 ```
 
@@ -141,7 +147,7 @@ One note per delivered work package, in `docs/layers/`, written by the session t
 what the package established, what a later slice must not do, and the dated handoff of every
 session that touched it. This index carries one line per note and never the content, so the
 entry point stays readable while the knowledge grows; a session reads only the notes its
-dependencies name (reading order, step 3). `docs/layers/README.md` states the form, and
+dependencies name, which `make brief` selects for it. `docs/layers/README.md` states the form, and
 `make check-docs` (`layer-notes`) fails when a `done` package has no note or no line here.
 
 None yet: no package has been delivered. The first one to reach `done` adds its line.

@@ -28,6 +28,7 @@ allowed-tools:
   - Bash(make rebuild-questions)
   - Bash(make install-hooks)
   - Bash(make unlock *)
+  - Bash(make brief *)
   # Stage A intake and Stage C assets: every subcommand of a `&&` or a pipe must match on its own
   - Bash(cd *)
   - Bash(mkdir *)

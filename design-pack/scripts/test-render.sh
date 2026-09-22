@@ -43,6 +43,7 @@ if command -v make >/dev/null 2>&1; then HAVE_MAKE=1; else HAVE_MAKE=""; printf 
 check_docs()   { if [ -n "$HAVE_MAKE" ]; then make check-docs; else python3 scripts/verify-chain.py && python3 scripts/check-docs.py; fi; }
 check_locks()  { if [ -n "$HAVE_MAKE" ]; then make check-locks; else python3 scripts/lock-guard.py --staged; fi; }
 verify_chain() { if [ -n "$HAVE_MAKE" ]; then make verify-chain; else python3 scripts/verify-chain.py; fi; }
+brief()        { if [ -n "$HAVE_MAKE" ]; then make brief TASK="$1"; else python3 scripts/check-docs.py --brief "$1"; fi; }
 install_hooks() {
     if [ -n "$HAVE_MAKE" ]; then make install-hooks
     else git config core.hooksPath .githooks; chmod +x .githooks/pre-commit .githooks/post-commit .githooks/pre-receive; python3 scripts/lock-guard.py --relock; fi
@@ -603,6 +604,46 @@ else
 fi
 git checkout -q -- AGENTS.md TRACEABILITY.md
 rm -rf docs/layers/FND-02.md
+
+# --- 10. the brief: the pack reading itself for one package ---------------------
+
+if brief FND-01 > "$work/brief.out" 2>&1; then
+    report ok "10 make brief TASK=FND-01 exits 0 on the rendered pack" ""
+else
+    report no "10 make brief" "$(tail -5 "$work/brief.out")"
+fi
+
+# Every section, and the material actually resolved rather than named.
+if grep -q '^--- PLAN.md `Now`' "$work/brief.out" \
+   && grep -q '^--- spec sections cited ([1-9]' "$work/brief.out" \
+   && grep -q 'The service MUST be a single Python application' "$work/brief.out" \
+   && grep -q '| FND-01 | 0 |' "$work/brief.out" \
+   && grep -qE '^[0-9]+ bytes above this line' "$work/brief.out"; then
+    report ok "10b the brief resolves the cited spec text and carries the row, not just the citation" ""
+else
+    report no "10b brief content" "$(grep -c '' "$work/brief.out") lines; $(grep '^---' "$work/brief.out" | head)"
+fi
+
+# The whole point: it is smaller than the documents it replaces.
+b=$(wc -c < "$work/brief.out")
+whole=$(cat AGENTS.md PLAN.md QUESTIONS.md GAPS.md TRACEABILITY.md DECISIONS.md specs/*.md | wc -c)
+if [ "$b" -lt "$whole" ]; then
+    report ok "10c the brief ($b bytes) is smaller than the documents a session would otherwise read ($whole)" ""
+else
+    report no "10c brief size" "brief $b bytes, documents $whole bytes"
+fi
+
+if [ -n "$HAVE_MAKE" ]; then
+    if make brief > "$work/brief-usage.out" 2>&1; then
+        report no "10d make brief with no TASK" "exited 0"
+    elif grep -q 'usage: make brief TASK=' "$work/brief-usage.out"; then
+        report ok "10d make brief with no TASK prints the usage line and exits non-zero" ""
+    else
+        report no "10d brief usage" "$(cat "$work/brief-usage.out")"
+    fi
+else
+    report ok "10d (skipped: make is not installed)" ""
+fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

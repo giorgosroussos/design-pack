@@ -15,6 +15,16 @@ live `blocked-by`. It is what writes the stored fields when the plan is
 compiled, and what an orchestrator reads before a task to apply the
 prompt-selection table in AGENTS.md.
 
+`--brief PACKAGE` (`make brief TASK=...`) prints what a session working on that
+package has to read, in one place: its characteristics, the `Now` item, the
+package's own block in the plan, the cards blocking it, the text of every spec
+section it cites, the decisions those sections cite, the layer notes of the
+packages it names, its TRACEABILITY.md row and the GAPS.md rows naming it. It
+selects and never summarises: which parts of the pack a task needs is a
+derivation over citations the pack already carries, and a derivation belongs
+here rather than in an agent's judgement at the start of every session. It ends
+with its own byte count, which is the reading cost of that package.
+
 `--only` keeps the FAIL lines of the named rules and drops the rest, for the
 passes a stage runs before every document exists (Stage A's exit, Stage B's
 rounds); the summary says how many failures were dropped, so a scoped run
@@ -1162,8 +1172,12 @@ def check_task_policy(root, cards):
     check_policy_table(root)
 
 
-def report_tasks(root, cards, selector):
-    """`--task`: the characteristics of one package or of all, derived live."""
+def report_tasks(root, cards, selector, sink=None):
+    """`--task`: the characteristics of one package or of all, derived live.
+
+    With `sink`, the lines are appended to it instead of printed, which is how
+    `--brief` opens with exactly what `--task` would have said.
+    """
     derived = derive_characteristics(root, cards)
     packages = [p for p, _, _ in plan_package_blocks(root)]
     if selector != "all":
@@ -1178,11 +1192,201 @@ def report_tasks(root, cards, selector):
         stored = stored_characteristics(block)
         contract = (stored.get("Contract change") or [EMPTY])[0] or EMPTY
         cards_blocking = blocked_by(cards, pkg)
-        print("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %s"
-              % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
-                 LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY))
+        line = ("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %s"
+                % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
+                   LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY))
+        if sink is None:
+            print(line)
+        else:
+            sink.append(line)
     return 0
 
+
+# --- the brief ----------------------------------------------------------------
+#
+# `--brief` answers "what does this task need me to read", which is a derivation
+# over citations the pack already carries, not a judgement an agent should be
+# making at the start of every session. It SELECTS and never summarises: every
+# byte it prints is a line of the pack, resolved. A brief that paraphrased would
+# be a second source of truth, and the rule that no statement is untagged would
+# stop at its edge.
+
+
+def spec_path_by_number(root, nn):
+    for path in spec_files(root):
+        if os.path.basename(path).startswith("%s-" % nn):
+            return path
+    return None
+
+
+def is_descendant(section, other):
+    """`6.1` is a descendant of `6`; `6` is not a descendant of `6.1`."""
+    return section != other and section.startswith(other + ".")
+
+
+def spec_section_slice(root, nn, section):
+    """(relative path, heading, text) of `NN` §M, its subsections included."""
+    path = spec_path_by_number(root, nn)
+    if not path:
+        return None
+    lines = read(path).splitlines()
+    out, heading, taking = [], None, False
+    for line in lines:
+        m = SPEC_HEADING_RE.match(line)
+        if m:
+            number = m.group(2)
+            if number == section:
+                taking, heading = True, m.group(3)
+                out.append(line)
+                continue
+            if taking and not is_descendant(number, section):
+                break
+        if taking:
+            out.append(line)
+    if not taking:
+        return None
+    return os.path.relpath(path, root), heading, "\n".join(out).rstrip()
+
+
+def decision_entries(root):
+    """{D-NNN: entry text, heading included}, from the projection."""
+    path = os.path.join(root, "DECISIONS.md")
+    if not exists(path):
+        return {}
+    text = read(path)
+    heads = list(re.finditer(r"^##\s+(D-\d{3})\s+\(", text, re.M))
+    out = {}
+    for i, h in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+        out[h.group(1)] = text[h.start():end].rstrip()
+    return out
+
+
+def now_item_block(root, package):
+    """The `### <PACKAGE>` item under `## Now` in PLAN.md, or None."""
+    path = os.path.join(root, "PLAN.md")
+    if not exists(path):
+        return None
+    text = read(path)
+    if "## Now" not in text:
+        return None
+    now = text.split("## Now", 1)[1].split("## Next", 1)[0]
+    m = re.search(r"^###\s+%s\b.*?$(.*?)(?=^###\s|\Z)" % re.escape(package), now, re.M | re.S)
+    if not m:
+        return None
+    return now[m.start():m.end()].rstrip()
+
+
+def named_packages(text, exclude):
+    """Every work package a piece of text names, except the one it is about."""
+    return sorted(set(m.group(1) for m in WP_RE.finditer(text)) - {exclude})
+
+
+def gap_rows_naming(root, package):
+    path = os.path.join(root, "GAPS.md")
+    if not exists(path):
+        return []
+    return [line for line in read(path).splitlines()
+            if line.startswith("|") and package in line and not line.startswith("| ---")]
+
+
+def report_brief(root, cards, package):
+    """`--brief`: everything this package's session has to read, resolved."""
+    blocks = {pkg: (ln, block) for pkg, ln, block in plan_package_blocks(root)}
+    if package not in blocks:
+        sys.stderr.write("check-docs: %s is not a work package in the implementation plan\n" % package)
+        return 2
+    _, block = blocks[package]
+    now = now_item_block(root, package)
+    rows = traceability_rows(root)
+    out = []
+
+    def section(title):
+        out.append("")
+        out.append("--- %s %s" % (title, "-" * max(0, 74 - len(title))))
+        out.append("")
+
+    out.append("=== BRIEF %s %s" % (package, "=" * max(0, 68 - len(package))))
+    out.append("Everything below is a line of this pack, selected by what this package cites.")
+    out.append("Nothing here is a summary. Read the source tree next; read no other document")
+    out.append("whole unless you are changing cross-cutting architecture.")
+
+    section("characteristics (prompt selection: AGENTS.md)")
+    rc = report_tasks(root, cards, package, sink=out)
+    if rc:
+        return rc
+
+    section("PLAN.md `Now`")
+    out.append(now if now else "(%s is not the current `Now` item.)" % package)
+
+    section("implementation plan: the package")
+    out.append(block.strip())
+
+    blocking = blocked_by(cards, package)
+    section("cards blocking this package (%d)" % len(blocking))
+    if not blocking:
+        out.append("None. Prompt 3 does not run.")
+    for q in blocking:
+        out.append(cards[q][2].rstrip())
+        out.append("")
+
+    # The sections this package and its Now item cite, each once, parents only:
+    # a cited parent already carries its subsections.
+    cited = set(text_citations(block)) | set(text_citations(now or ""))
+    keep = [c for c in sorted(cited) if not any(c[0] == o[0] and is_descendant(c[1], o[1]) for o in cited)]
+    section("spec sections cited (%d)" % len(keep))
+    spec_text = []
+    for nn, sec in keep:
+        hit = spec_section_slice(root, nn, sec)
+        if hit is None:
+            out.append("`%s` §%s does not resolve -- the `citations` rule will say so." % (nn, sec))
+            continue
+        rel, heading, body = hit
+        out.append("[%s] `%s` §%s %s" % (rel, nn, sec, heading))
+        out.append(body)
+        out.append("")
+        spec_text.append(body)
+
+    entries = decision_entries(root)
+    cited_d = sorted(set(D_TAG_RE.findall("\n".join(spec_text) + block + (now or ""))))
+    section("decisions cited (%d)" % len(cited_d))
+    if not cited_d:
+        out.append("None.")
+    for d in cited_d:
+        out.append(entries.get(d, "%s is cited and has no entry -- the `provenance` rule will say so." % d))
+        out.append("")
+
+    deps = named_packages((now or "") + block, package)
+    notes = [(d, layer_note_path(root, d)) for d in deps]
+    notes = [(d, p) for d, p in notes if exists(p)]
+    section("layer notes of the packages this one names (%d of %d)" % (len(notes), len(deps)))
+    if deps and not notes:
+        out.append("None of %s has a note yet." % ", ".join(deps))
+    elif not deps:
+        out.append("This package names no other.")
+    for d, path in notes:
+        out.append("[%s]" % os.path.relpath(path, root))
+        out.append(read(path).rstrip())
+        out.append("")
+
+    section("TRACEABILITY.md")
+    if package in rows:
+        out.append(read(os.path.join(root, "TRACEABILITY.md")).splitlines()[rows[package][0] - 1])
+    else:
+        out.append("No row -- the `packages` rule will say so.")
+
+    gaps = gap_rows_naming(root, package)
+    section("GAPS.md rows naming %s (%d)" % (package, len(gaps)))
+    out.extend(gaps or ["None."])
+
+    text = "\n".join(out) + "\n"
+    sys.stdout.write(text)
+    sys.stdout.write("\n--- end of brief %s\n" % ("-" * 59))
+    sys.stdout.write("%d bytes above this line: the reading cost of this package. If it grows\n"
+                     % len(text.encode("utf-8")))
+    sys.stdout.write("faster than the package does, something is being written into the wrong\n"
+                     "document -- most often a layer note's worth of detail into AGENTS.md.\n")
+    return 0
 
 # --- event log ---------------------------------------------------------------
 
@@ -1251,15 +1455,22 @@ def main():
     ap.add_argument("--task", default=None, metavar="PACKAGE|all",
                     help="print the characteristics of a work package (derived) and the cards "
                          "blocking it (live) instead of running the rules")
+    ap.add_argument("--brief", default=None, metavar="PACKAGE",
+                    help="print everything a session working on this package has to read, "
+                         "selected from the pack by what the package cites")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
     only = set(r.strip() for r in args.only.split(",")) if args.only else None
 
-    if args.task:
-        # A reader, not a gate: it answers "what kind of task is this" without
-        # judging the pack, so an orchestrator can apply the table in AGENTS.md.
+    if args.task or args.brief:
+        # Readers, not gates: they answer "what kind of task is this" and "what
+        # does it need me to read" without judging the pack, so an orchestrator
+        # can apply the table in AGENTS.md and a session can open on the material
+        # rather than on six documents.
         cards, _, _ = parse_cards(root)
-        return report_tasks(root, cards, args.task)
+        if args.task:
+            return report_tasks(root, cards, args.task)
+        return report_brief(root, cards, args.brief)
 
     docs = [os.path.join(root, d) for d in ROOT_DOCS if exists(os.path.join(root, d))]
     specs = spec_files(root)

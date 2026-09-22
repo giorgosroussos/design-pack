@@ -30,7 +30,7 @@ Every agent receives:
 - explicit non-goals;
 - commands for lint, tests and build (always `make` targets).
 
-Do not give every agent the whole project unless the task is architectural review. Retrieve only the relevant specs plus `specs/README.md` and `{{NN_REGISTER}}-decision-register.md`. From `DECISIONS.md`, read the index and the entries the current `PLAN.md` item cites.
+Do not give every agent the whole project unless the task is architectural review. The packet is not assembled by hand and not by judgement: `make brief TASK=<PACKAGE>` prints it, selected from the pack by what the package cites, and every line of it is a line of the pack rather than a summary of one. Read it, plus `specs/README.md` and `{{NN_REGISTER}}-decision-register.md`; a document is read whole only for the reasons `AGENTS.md` lists.
 
 ## 3. Agent execution contract
 

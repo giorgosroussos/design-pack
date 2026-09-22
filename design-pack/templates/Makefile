@@ -18,7 +18,7 @@ define not_yet
 	@echo "make $(1): not implemented yet. Delivered by work package $(2); see PLAN.md and specs/{{NN_PLAN}}-implementation-plan.md §3." >&2; exit 1
 endef
 
-.PHONY: help setup infra-up infra-status infra-down migrate dev test lint format format-check typecheck {{CONTRACT_DRIFT_TARGET}} build verify smoke audit scan-secrets check-docs check-locks verify-chain rebuild-decisions rebuild-questions install-hooks unlock clean-start
+.PHONY: help setup infra-up infra-status infra-down migrate dev test lint format format-check typecheck {{CONTRACT_DRIFT_TARGET}} build verify smoke audit scan-secrets check-docs check-locks verify-chain rebuild-decisions rebuild-questions install-hooks unlock brief clean-start
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -81,6 +81,13 @@ rebuild-decisions: ## Render DECISIONS.md from the event log's decisions stream
 
 rebuild-questions: ## Render QUESTIONS.md from the event log's questions stream
 	python3 scripts/rebuild-questions.py
+
+# `brief` is a reader, not a gate: it prints what a session working on one package
+# has to read, selected from the pack by what that package cites. It never writes
+# and never judges, which is why it has no place in `verify`.
+brief: ## Everything a session working on one package has to read: brief TASK=<PACKAGE>
+	@test -n "$(TASK)" || { echo 'usage: make brief TASK=<PACKAGE>  (an ID from specs/{{NN_PLAN}}-implementation-plan.md)' >&2; exit 2; }
+	@python3 scripts/check-docs.py --brief $(TASK)
 
 # `rebuild-decisions` is deliberately NOT a prerequisite of check-docs: it would
 # repair a drifted projection instead of failing on it, which is the opposite of

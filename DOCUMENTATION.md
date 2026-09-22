@@ -66,6 +66,16 @@ implies. The fourth characteristic, `blocked-by`, is never stored: it is read fr
 when the task starts, so resolving a blocking card needs no ceremonial unlock of a hard-locked
 plan.
 
+The same reasoning decides what a session reads. Which parts of the pack a task needs is a
+derivation over citations the pack already carries, so it belongs in a command rather than in an
+agent's judgement: `make brief TASK=<PACKAGE>` prints the package's characteristics, the `Now`
+item, its block in the plan, the cards blocking it, the **text** of every spec section it cites,
+the decisions those cite, the layer notes of the packages it names, its `TRACEABILITY.md` row and
+the `GAPS.md` rows naming it — then its own byte count, which is that package's reading cost. It
+selects and never summarises: every line it prints is a line of the pack, so it cannot become a
+second source of truth. The session prompt opens with it and names no document whole except
+`AGENTS.md` and the two short files that govern everything the brief contains.
+
 ---
 
 ## 2. The three layers of the design
@@ -547,10 +557,10 @@ Each runs in a throwaway repository and exits non-zero on any wrong behaviour.
 | `test-decisions-log.sh` | 17 | append, rebuild, determinism, supersession, a tampered log line, a hand-edited projection, the refusal to append onto a broken chain, and the events no projection can fold (an ID that skips ahead, an approval aimed at a non-ADR) |
 | `test-questions-log.sh` | 34 | cards opened, answered, deferred, reactivated, resolved and superseded; the provenance seam from both sides; interleaved streams rendering identically to separated ones; refused events including a card ID that skips ahead; and that `stage-detect` reads the projection rather than the log |
 | `test-check-docs.sh` | 26 | the `check-docs` rules one at a time over minimal fixtures: `markers` over the root Makefile, `cards` contiguity, `normative-tagged` (code spans, fences, tables and lead-in inheritance; the adopted-pack exemption), `inferred-zero` before and after the baseline stamp, that `extract-normative` reads the same detector, and `layer-notes` in seven shapes (a `done` package without a note, a note missing a heading, a note absent from the index, the clean pair, the shipped README and `_`-prefixed files, a note naming no package, and a section per package in `AGENTS.md`) |
-| `test-task-policy.sh` | 15 | the `task-policy` rule and the `--task` reader over a fixture pack: a package citing a security-surfaced section, one citing none, a hand-edited `Surfaces`, a red line moving onto a package that denies it, four ways the policy table can lie, the field shapes, a package written as a single line whose citations sit on that line, and `blocked-by` answering live while the plan file stays byte-identical |
+| `test-task-policy.sh` | 22 | the `task-policy` rule and the `--task` reader over a fixture pack: a package citing a security-surfaced section, one citing none, a hand-edited `Surfaces`, a red line moving onto a package that denies it, four ways the policy table can lie, the field shapes, a package written as a single line whose citations sit on that line, and `blocked-by` answering live while the plan file stays byte-identical; then `--brief` over the same fixture: every section once in the fixed order with its counts, the cited spec text and the dependency's layer note carried in full, only the rows naming the package, the byte-count footer, a plan byte-identical afterwards, an unknown package exiting non-zero, a blocking card carried with its options, and a retitled section still resolving |
 | `test-stage-detect.sh` | 11 | a target walked through every state — empty, inputs saved, cards Blocking, answered, deferred, spec map, files, `AGENTS.md`, baseline — with the verdict asserted at each, including a Blocking card raised during Stage B |
 | `test-allowed-tools.sh` | 2 | every backticked shell command in `stages/*.md` and `SKILL.md`, split into subcommands the way Claude Code matches them, is pre-approved by an `allowed-tools` pattern |
-| `test-render.sh` | 27 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, one broken red line failing the gate, one hand-edited task characteristic failing it, and the layer-note seam through the whole gate (a package reaching `done` without a note fails; the note plus its index line passes; a per-package section in `AGENTS.md` fails) |
+| `test-render.sh` | 31 | every template rendered for a fixture product per Stage C1–C2, the log seeded with the regime records and two cards: `make check-docs`, `verify-chain`, both projections fresh and byte-stable, no placeholder or skill reference left, `stage-detect` walking C → D → frozen, the lock layer over the first commit, the freeze promotion as a ceremony and the guard's self-protection, one broken red line failing the gate, one hand-edited task characteristic failing it, the layer-note seam through the whole gate (a package reaching `done` without a note fails; the note plus its index line passes; a per-package section in `AGENTS.md` fails), and `make brief` on the rendered pack: it exits 0, resolves the cited spec text, is smaller than the documents it replaces, and prints a usage line without a `TASK` |
 
 They are worth running against a mutation, not only against the current code: disabling the hash
 comparison, dropping a stream filter, leaking `seq` into a rendering or removing the supersession

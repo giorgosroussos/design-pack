@@ -670,7 +670,7 @@ Acceptance:
 
 ## W10 — What a session must read grows without bound, and the knowledge a run buys has no home
 
-Status: in progress (W10.1 and W10.6 done; W10.2–W10.5 not started)
+Status: in progress (W10.1, W10.2 and W10.6 done; W10.3–W10.5 not started)
 Decision: the two owner questions were decided on 2026-09-22 — **the owner accepted both
 recommendations as written** (Q-W10.1: a layer note for every `done` package; Q-W10.5: the two
 new characteristics live in the implementation plan). The rest are fixes.
@@ -839,16 +839,24 @@ Estimate: 1 day. Second-order benefit, free: the brief's byte count is the per-p
 cost, which is the metric this item is judged by (see the closing note).
 
 Acceptance:
-- [ ] `--brief FND-01` on the `test-render.sh` fixture prints every section above, in order, and
-      resolves every citation; a package ID the plan does not define exits non-zero.
-- [ ] a card moved to Resolved changes the brief with no edit to the plan (the `blocked-by`
-      guarantee of W9, now visible in the material).
-- [ ] a spec section renamed but not renumbered still resolves; a dead citation in a cited
-      decision does not crash the brief (it is already refused at the door by W7.1).
-- [ ] `make brief TASK=` with no argument prints the usage line and exits non-zero.
-- [ ] `commands` passes with the new target; `test-render.sh` proves a rendered pack's brief is
-      non-empty for FND-01 and that the whole gate still passes.
-- [ ] prompt 1 no longer names a document whole, except `AGENTS.md`.
+- [x] `--brief FND-01` on the `test-render.sh` fixture prints every section above, in order, and
+      resolves every citation; a package ID the plan does not define exits non-zero. *(cases 10,
+      10b in `test-render.sh`; 11, 11e in `test-task-policy.sh`, which asserts the section list
+      and its counts as one string)*
+- [x] a card moved to Resolved changes the brief with no edit to the plan (the `blocked-by`
+      guarantee of W9, now visible in the material). *(11f carries the card with its options;
+      11d proves the plan is byte-identical after a brief; case 6/6b already held the
+      characteristic half)*
+- [x] a spec section renamed but not renumbered still resolves *(11g)*; a dead citation in a
+      cited decision does not crash the brief — the brief prints the entry as the projection
+      renders it and resolves nothing inside it, and `log-append` refuses such a citation at the
+      door (W7.1).
+- [x] `make brief TASK=` with no argument prints the usage line and exits non-zero. *(10d)*
+- [x] `commands` passes with the new target; `test-render.sh` proves a rendered pack's brief is
+      non-empty for FND-01 and that the whole gate still passes. *(10, 10b, 10c: 7.3 KB of brief
+      against 50 KB of documents on the fixture)*
+- [x] prompt 1 no longer names a document whole, except `AGENTS.md`, `specs/README.md` and the
+      register — the two short files that govern everything the brief contains.
 
 ### W10.3 — Two living documents have no growth ceiling, and become chronicles
 
@@ -1382,3 +1390,34 @@ Append-only. One entry per session per item touched. Form:
   `templates/layer-note.md` was deleted rather than shipped. Packs generated before this change
   have no `docs/layers/`, no index section and no `docs/gotchas.md`; their first `done` package
   fails `layer-notes` until the three are added, which is the intended migration.
+
+### 2026-09-22 — W10.2 — done
+- Changed: `templates/scripts/check-docs.py` gains `--brief PACKAGE` beside `--task` (and
+  `report_tasks` an optional sink, so the brief opens with exactly the line `--task` would have
+  printed): the `Now` item, the package's block in the plan, the blocking cards in full, the
+  **text** of every spec section the package and the item cite — resolved through the same
+  `section_index` the `citations` rule uses, each section once, a cited parent swallowing its
+  subsections — the `D-NNN` entries those texts cite, the layer notes of the packages the item
+  names, the `TRACEABILITY.md` row, the `GAPS.md` rows naming the package, and a byte-count
+  footer. `templates/Makefile` gains `brief` (with a usage line when `TASK` is empty) and the
+  `.PHONY` list; `templates/AGENTS.md` lists it under Commands, where the `commands` rule holds
+  it to the Makefile, and its reading order is rewritten around it: four steps, then a short list
+  of the only reasons to read a document whole. `templates/specs/agent-playbook.md` §2's task
+  packet now has a producer rather than an instruction. Prompt 1 opens with the brief.
+  `stages/C-operationalize.md` C4.5 runs it once on the compiled pack and reports its byte count.
+  `SKILL.md` and `templates/claude-settings.local.json` both gain `Bash(make brief *)` — the
+  allowed-tools suite failed on the second until it did.
+  Docs: `DOCUMENTATION.md` §1 and the suite table.
+- Proved by: eight suites green — 26 + 17 + 34 + 26 + 31 + 2 + 11 + 22 = 169 cases, up from 158.
+  `test-task-policy.sh` +7 (the section list and its counts as one string; the cited spec text,
+  the dependency's note and only the rows naming the package; the byte-count footer; a plan
+  byte-identical after a brief; an unknown package exiting non-zero; the blocking card with its
+  options; a retitled section still resolving). `test-render.sh` +4 (`make brief` exits 0 on the
+  rendered pack, resolves the cited spec text and carries the row rather than the citation, is
+  smaller than the documents it replaces — 7.3 KB against 50 KB on a fixture with four packages —
+  and prints its usage line without a `TASK`).
+- Left open: nothing in this item. Two things worth naming for W10.5 and for whoever reads the
+  brief first: a package that cites a whole phase section gets that whole section, the
+  neighbouring packages included, which is correct selection and not a defect — the citation is
+  what the plan wrote; and the brief resolves nothing *inside* a decision entry, because the
+  entry is a projection of the log and its text is history.

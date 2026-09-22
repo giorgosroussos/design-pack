@@ -15,19 +15,22 @@ Copy one of the prompts below into a fresh agent session. Adjust the bracketed p
 
 ## Which of the three a task needs
 
-Prompt 1 runs for every task; prompts 2 and 3 are conditional, and the condition is not a judgement. Before starting the `Now` package, read its `Surfaces`, `Touches red line` and `Contract change` in `specs/{{NN_PLAN}}-implementation-plan.md`, and compute `blocked-by`: the cards in `QUESTIONS.md` under Blocking or Open whose `Blocks:` names the package. `python3 scripts/check-docs.py --task <TASK-ID>` prints all four in one line. Then apply the table in `AGENTS.md` "Prompt selection" and run only what it selects, in the order 3, 1, 2. Nothing is written back: the stored three are verified by `make check-docs`, and `blocked-by` is live, so a card resolved this morning changes the answer this afternoon without an edit to the plan.
+Prompt 1 runs for every task; prompts 2 and 3 are conditional, and the condition is not a judgement. Before starting the `Now` package, read its `Surfaces`, `Touches red line` and `Contract change` in `specs/{{NN_PLAN}}-implementation-plan.md`, and compute `blocked-by`: the cards in `QUESTIONS.md` under Blocking or Open whose `Blocks:` names the package. `python3 scripts/check-docs.py --task <TASK-ID>` prints all four in one line, and `make brief TASK=<TASK-ID>` opens with the same line before the material the task needs. Then apply the table in `AGENTS.md` "Prompt selection" and run only what it selects, in the order 3, 1, 2. Nothing is written back: the stored three are verified by `make check-docs`, and `blocked-by` is live, so a card resolved this morning changes the answer this afternoon without an edit to the plan.
 
 ## 1. Default: implement the current `Now` item
 
 ```text
 Implement the current `Now` item in PLAN.md using AGENTS.md as the working contract.
 
-Before changing anything, read AGENTS.md, PLAN.md, QUESTIONS.md, GAPS.md and TRACEABILITY.md,
-then the DECISIONS.md index and the D-entries the `Now` item cites, then the layer note
-(docs/layers/<PACKAGE>.md) of every package the item names as a dependency, then specs/README.md,
-specs/{{NN_REGISTER}}-decision-register.md and every spec section the `Now` item references.
-Inspect existing code and tests before editing. Restate your assumptions and flag any conflict
-with a locked decision before you start.
+Before changing anything, run `make brief TASK=<the Now item's package ID>` and read what it
+prints: it selects, from this pack, everything this package cites — its characteristics, the
+`Now` item, its block in the plan, the cards blocking it, the text of the spec sections it cites,
+the decisions those cite, the layer notes of the packages it names, its TRACEABILITY.md row and
+the GAPS.md rows naming it. Then read AGENTS.md, specs/README.md and
+specs/{{NN_REGISTER}}-decision-register.md. Read no other document whole unless AGENTS.md's
+reading order gives you the reason to. Then inspect the existing code and tests — that is where
+this session's reading budget belongs. Restate your assumptions and flag any conflict with a
+locked decision before you start.
 
 Work in the smallest vertical slice that produces the item's observable outcome. Add or update
 tests in the same change, including {{ISOLATION_AXIS}} isolation cases where a resource is owned.

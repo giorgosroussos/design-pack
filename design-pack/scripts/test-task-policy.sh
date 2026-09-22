@@ -339,5 +339,126 @@ else
     report no "10 unknown surface" "$(cat "$work/10.out")"
 fi
 
+# --- 11: --brief selects the pack, in order, and never writes -------------------
+
+fixture
+cat > PLAN.md <<'EOF'
+# PLAN
+
+## Now
+
+### PKG-01 — Keeper access
+
+- **Outcome:** the ownership rule of `01` §2 holds in one place.
+- **Dependencies:** PKG-02.
+
+## Next
+
+1. PKG-03.
+EOF
+cat > TRACEABILITY.md <<'EOF'
+# TRACEABILITY
+
+| Package | Phase | Outcome | Key specs | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| PKG-01 | 0 | Keeper access | `01` §2 | not started | — |
+| PKG-02 | 0 | Totals | `01` §1 | done | 2026-09-22: TotalsTest |
+| PKG-03 | 0 | Keeper access, one line | `01` §2 | not started | — |
+EOF
+cat > GAPS.md <<'EOF'
+# GAPS
+
+| ID | Gap | Consequence | Evidence to close | Plan item |
+| --- | --- | --- | --- | --- |
+| G-001 | No ownership check exists yet. | Anyone could read a notebook. | A test naming the refusal. | PKG-01 |
+| G-002 | Totals are not paged. | Long notebooks are slow. | A measurement. | PKG-09 |
+EOF
+cat > DECISIONS.md <<'EOF'
+# DECISIONS
+
+## Index
+
+- D-001 — Change control regime
+
+## D-001 (2026-09-14) — Change control regime
+Type: implementation
+Decision: a proposed change to the register requires an ADR.
+Why: the register is the owner's.
+Alternatives: none weighed.
+Affected specs: `02` §6.
+EOF
+mkdir -p docs/layers
+printf '# PKG-02 — the totals layer\n\n## What this package established\n\n`Totals::forMonth()` is the only reader.\n\n## What a later slice must not do\n\nDo not store a total.\n\n## Handoff\n\n### 2026-09-22\n\n- Changed: the totals module.\n' > docs/layers/PKG-02.md
+
+# The package block and the `Now` item both cite `01` §2: the brief resolves each
+# section once, so the count is 1 rather than 2.
+cp specs/03-implementation-plan.md "$work/plan.before11"
+out="$(python3 scripts/check-docs.py --brief PKG-01 2>&1)"
+order="$(printf '%s' "$out" | grep -oE '^--- [a-zA-Z].*' | sed -E 's/ -+$//')"
+expected="--- characteristics (prompt selection: AGENTS.md)
+--- PLAN.md \`Now\`
+--- implementation plan: the package
+--- cards blocking this package (0)
+--- spec sections cited (1)
+--- decisions cited (0)
+--- layer notes of the packages this one names (1 of 1)
+--- TRACEABILITY.md
+--- GAPS.md rows naming PKG-01 (1)
+--- end of brief"
+if [ "$order" = "$expected" ]; then
+    report ok "11 --brief prints every section once, in the fixed order, with its counts" ""
+else
+    report no "11 brief order" "$(printf '%s' "$order" | head -12)"
+fi
+
+if printf '%s' "$out" | grep -q 'A notebook MUST be readable by its keeper only' \
+   && printf '%s' "$out" | grep -q '`Totals::forMonth()` is the only reader' \
+   && printf '%s' "$out" | grep -q 'G-001' && ! printf '%s' "$out" | grep -q 'G-002' \
+   && printf '%s' "$out" | grep -q '| PKG-01 | 0 |' && ! printf '%s' "$out" | grep -q '| PKG-02 | 0 |'; then
+    report ok "11b --brief carries the cited spec text, the dependency's layer note, and only the rows naming this package" ""
+else
+    report no "11b brief content" "$(printf '%s' "$out" | tail -20)"
+fi
+
+if printf '%s' "$out" | grep -qE '^[0-9]+ bytes above this line'; then
+    report ok "11c --brief ends with its own byte count: the package's reading cost" ""
+else
+    report no "11c byte count" "$(printf '%s' "$out" | tail -4)"
+fi
+
+if cmp -s "$work/plan.before11" specs/03-implementation-plan.md; then
+    report ok "11d a brief writes nothing: the plan is byte-identical after it" ""
+else
+    report no "11d brief writes" "the plan changed"
+fi
+
+if python3 scripts/check-docs.py --brief PKG-99 > "$work/11e.out" 2>&1; then
+    report no "11e an unknown package" "exited 0"
+elif grep -q 'PKG-99 is not a work package' "$work/11e.out"; then
+    report ok "11e an unknown package exits non-zero, naming it" ""
+else
+    report no "11e unknown package" "$(cat "$work/11e.out")"
+fi
+
+# The card blocking PKG-02 is carried in full, and resolving it changes the brief
+# with no edit to the plan - the same guarantee --task has, now over the material.
+out2="$(python3 scripts/check-docs.py --brief PKG-02 2>&1)"
+if printf '%s' "$out2" | grep -q 'cards blocking this package (1)' \
+   && printf '%s' "$out2" | grep -q 'B) Purge after N years'; then
+    report ok "11f --brief carries the blocking card in full, options included" ""
+else
+    report no "11f blocking card" "$(printf '%s' "$out2" | head -30)"
+fi
+
+# A section renumbered would be a different citation; a section RETITLED is not.
+sed -i 's/^## 2. Access$/## 2. Access and ownership/' specs/01-scope.md
+out3="$(python3 scripts/check-docs.py --brief PKG-01 2>&1)"
+if printf '%s' "$out3" | grep -q '`01` §2 Access and ownership' \
+   && printf '%s' "$out3" | grep -q 'A notebook MUST be readable by its keeper only'; then
+    report ok "11g a retitled section still resolves: the brief reads the number, not the words" ""
+else
+    report no "11g retitled section" "$(printf '%s' "$out3" | grep -A3 'spec sections')"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

@@ -151,7 +151,13 @@ it needs no ceremony, and `task-policy` fails in Step C4 if it is skipped. `Surf
    `projection-fresh` passing for both `DECISIONS.md` and `QUESTIONS.md`, and running each
    `rebuild-*` tool twice leaves its file unchanged the second time. If the rebuild is not byte-stable, `projection-fresh` will
    fail on a clean repository and the cause is the renderer, not the pack.
-5. The lock layer answers: `git config core.hooksPath` reads `.githooks`, and
+5. The readers answer, on the pack just compiled: `make brief TASK=FND-01` exits 0 and prints
+   the `Now` item, the package's block, the sections it cites and its `TRACEABILITY.md` row, and
+   `python3 scripts/check-docs.py --task all` prints a line per package. Report the brief's own
+   byte count from its last line: it is the reading cost of the first package and the number the
+   pack's own efficiency is measured by later. A brief that resolves nothing means the plan's
+   citations do not resolve, which `check-docs` will also be saying.
+6. The lock layer answers: `git config core.hooksPath` reads `.githooks`, and
    `python3 scripts/lock-guard.py --tier docs/inputs/README.md` prints `hard-locked` while
    `--tier PLAN.md` prints `free`. A manifest that fails to parse exits 2 and is a Stage C
    failure, not a warning.
