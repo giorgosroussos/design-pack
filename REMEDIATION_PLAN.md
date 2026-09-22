@@ -49,6 +49,8 @@ bash design-pack/scripts/test-stage-detect.sh
 | W6 | `allowed-tools` completeness + real dry run | B — usability | ½ hour + a run | done |
 | W7 | Findings of the dry run (F1–F14, D1–D5) | mixed; 3 owner decisions | ~2 days | done |
 | W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
+| W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
+| W10 | Session reading cost and the knowledge a run buys | B — run economics; 1 owner decision | ~3½ days | not started |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -663,6 +665,344 @@ Acceptance:
 - [x] `scripts/test-render.sh` proves a rendered pack passes the new rule, and that a hand-edited
       characteristic fails it.
 - [x] The seven other suites unchanged and green.
+
+---
+
+## W10 — What a session must read grows without bound, and the knowledge a run buys has no home
+
+Status: not started
+Decision: the two owner questions were decided on 2026-09-22 — **the owner accepted both
+recommendations as written** (Q-W10.1: a layer note for every `done` package; Q-W10.5: the two
+new characteristics live in the implementation plan). The rest are fixes.
+
+Source: the review of 2026-09-22 against `guestportal-2026` — the pre-skill exemplar this method
+was generalised from, at its `GST-04` `Now` item, eight phases into implementation. Its pack was
+hand-built, so nothing below is a defect *of* the skill; it is what this method's own structure
+becomes after thirty-odd work packages, measured on the only instance that has run that long.
+Part of what it shows is already prevented here — W9's prompt selection, the `DECISIONS.md` index
+and the reading order that narrows it, the `agents-size` ceiling. The six items below are what is
+not prevented by anything, and the first of them is the cause of two others.
+
+Reproduce (in a pack that has run for some phases):
+
+```
+wc -c AGENTS.md DECISIONS.md TRACEABILITY.md GAPS.md QUESTIONS.md PLAN.md
+python3 - <<'PY'
+import re
+t = open('AGENTS.md').read()
+s = [(len(x), x.split('\n',1)[0]) for x in re.split(r'(?m)^## ', t)[1:]]
+print('sections:', len(s), 'bytes:', sum(n for n,_ in s))
+for n, title in sorted(s, reverse=True)[:5]: print(f'{n:7d}  {title[:60]}')
+PY
+```
+
+What it printed there, on 2026-09-22:
+
+| Document | Size | ≈ tokens | What it is |
+| --- | --- | --- | --- |
+| `DECISIONS.md` | 641 KB | ~160k | 295 entries, mean 2.1 KB |
+| `TRACEABILITY.md` | 355 KB | ~89k | 43 rows; the Evidence cells hold every run since the first |
+| `AGENTS.md` | 209 KB | ~52k | 628 lines, **31 of its 39 sections are one per work package** |
+| `GAPS.md` | 174 KB | ~43k | 108 rows; `G-001` alone is a single table cell of ~20 KB |
+| `QUESTIONS.md` | 75 KB | ~19k | |
+| **read before any code** | **~1.46 MB** | **~365k** | what that pack's session prompt 1 mandates |
+
+The material a reader actually needs for `GST-04` — three spec sections, two decisions, three
+`AGENTS.md` sections, one traceability row — is about **35 KB**. The ratio is 40:1, and the
+40 is not history the agent can skim past: it is in the prefill of every turn of a run that the
+owner measures in hours, it dilutes attention over a 1063-file source tree, and it is what
+makes a long slice end in compaction rather than in a handoff.
+
+The 20 KB `agents-size` ceiling this skill already enforces is not a smaller version of that
+file: the eight *structural* sections of it — the ones this skill's template compiles — are
+21.5 KB. Everything above that, 186 KB of it, is knowledge that had nowhere else to go.
+
+### W10.1 — Per-package architecture notes have no home, so they end up in `AGENTS.md`
+
+`templates/specs/agent-playbook.md` §2 requires that every agent receive "repository conventions
+and **current architecture notes**", and §10 says to "keep a short task log or merge description
+with decisions and commands". Neither names a file, and no template creates one. So the answer
+to "what did TEN-01 establish that every later slice must not get wrong" has exactly two places
+to go: `AGENTS.md`, where it is read by every session forever, or nowhere. The exemplar chose
+`AGENTS.md` thirty-one times.
+
+Under this skill the same pressure hits the 20 KB ceiling, and `templates/AGENTS.md`'s own
+overflow sentence sends the content to `specs/{{NN_PLAYBOOK}}-agent-playbook.md` or `docs/` —
+but `specs/**` is promoted to hard-locked at the freeze, so the sanctioned overflow target costs
+a `make unlock` ceremony per slice. That is a trap, and it is in the template today.
+
+The same absence explains prompt 1's handoff. It ends "Finish with a handoff: behaviour changed,
+commands run and their results, migration and rollback notes, security and privacy
+considerations, follow-ups not implemented" — and every word of that is written to the chat
+transcript, which the next session cannot read. What survives a session boundary is only what a
+file holds, which is why, in the exemplar, the handoff silted up into `AGENTS.md`, into the
+Evidence cells of `TRACEABILITY.md` and into the Gap cells of `GAPS.md` (W10.3).
+
+Fix. Files: `design-pack/stages/C-operationalize.md`, `design-pack/templates/AGENTS.md`,
+`design-pack/templates/.doc-locks`, `design-pack/templates/specs/agent-playbook.md`,
+`design-pack/templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`,
+`design-pack/templates/scripts/check-docs.py`, plus a new
+`design-pack/templates/layer-note.md`.
+
+1. **The artifact.** `docs/layers/<PACKAGE>.md`, one per work package, written by the session
+   that delivers the package and appended to by any later session that changes the layer. Fixed
+   headings, from the new template: *What this package established* (the names a later slice
+   calls, not a narrative), *What a later slice must not do*, *Handoff* (the last session's
+   report, dated). It is prose for an agent, so it has no `check-docs` rules beyond existence
+   and headings.
+2. **Stage C** creates `docs/layers/` with a README stating the above (Step C2, beside the
+   truthful-empty living documents), and `.doc-locks` gains `free: docs/layers/**` in the free
+   block. It does not overlap `hard-locked: docs/inputs/**`, so last-match-wins is not engaged
+   and the line's position is not load-bearing; say so in the comment, because every other line
+   in that file is positional.
+3. **`AGENTS.md` carries the index, never the content**: one line per delivered package
+   (`TEN-01 — tenancy context, scoped binding → docs/layers/TEN-01.md`). At ~90 bytes a line,
+   forty packages cost ~3.6 KB against the 20 KB ceiling, which is the arithmetic that makes
+   inlining impossible and is worth stating in the template notes.
+4. **New rule `layer-notes`**: every package whose `TRACEABILITY.md` status is `done` has a
+   `docs/layers/<PACKAGE>.md` with the required headings and an index line in `AGENTS.md`; every
+   file under `docs/layers/` names a package the plan defines. And: no `AGENTS.md` heading
+   contains a work-package ID — which is the mechanical form of "the index, never the content",
+   and the one assertion that would have stopped the exemplar's `AGENTS.md` at 22 KB.
+5. **The reading order** (`templates/AGENTS.md`) gains: the layer notes of the packages the
+   active item names as dependencies, and no others. **Playbook §2** names the file instead of
+   "architecture notes"; **§10**'s "short task log" becomes the note's Handoff section.
+   **Prompt 1** writes the note as part of the slice, not after it.
+
+Q-W10.1 (owner): is a layer note required for **every** `done` package, or only where the
+package established something a later slice can get wrong? A package can legitimately have
+nothing to pass on, and a rule that forces one invites three sentences of ceremony.
+Recommendation: **required for every package**, with "nothing a later slice needs to know"
+as a legitimate body — the same argument as truthful-empty living documents, which say
+`not started` rather than saying nothing. An optional note is one an agent under budget
+pressure never writes, and the absence would then mean both "nothing to say" and "no time to
+say it", which is the ambiguity this method exists to remove. Decision: **required for every
+`done` package (owner, 2026-09-22)** — the recommendation as written. `layer-notes` fails on a
+missing note whatever the package did, and the template's body may say that nothing was
+established. Estimate: 1 day.
+
+Acceptance:
+- [ ] a rendered pack has `docs/layers/README.md`, `free: docs/layers/**` in the manifest, and
+      an empty index section in `AGENTS.md`; `test-render.sh` proves the whole gate still passes.
+- [ ] a fixture with a `done` package and no note fails `layer-notes`; adding the note with its
+      three headings passes; a note whose package the plan does not define fails.
+- [ ] an `AGENTS.md` heading containing a package ID fails `layer-notes`.
+- [ ] `test-lock-guard.sh`: a write under `docs/layers/` is accepted by the guard, and a write
+      under `docs/inputs/` is still refused, in the same commit.
+- [ ] the playbook, the reading order and prompt 1 name the file; no template still sends
+      overflow to `specs/`.
+
+### W10.2 — Nothing computes what a task must read, so the prompt names whole documents
+
+Prompt 1 says to read `AGENTS.md`, `PLAN.md`, `QUESTIONS.md`, `GAPS.md`, `TRACEABILITY.md`, the
+`DECISIONS.md` index and cited entries, `specs/README.md`, the register, and the cited spec
+sections. W9 already narrowed the worst of it — the exemplar's own prompt says to read all of
+`DECISIONS.md`, 641 KB of it — but four of those documents are still named whole, and in the
+exemplar `GAPS.md` and `TRACEABILITY.md` together are 529 KB, which is nearly what `DECISIONS.md`
+costs. Narrowing the sentence further is not the fix; the fix is that **which parts are relevant
+is a derivation the pack can already do**, from citations it already carries, and a derivation
+this skill's own rule says belongs in `check-docs` rather than in an agent's judgement.
+
+`--task` (W9) is that derivation, stopping one step early: it prints four characteristics and
+nothing of the material.
+
+Fix. Files: `design-pack/templates/scripts/check-docs.py`, `design-pack/templates/Makefile`,
+`design-pack/templates/AGENTS.md`, `design-pack/templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`,
+`design-pack/templates/specs/agent-playbook.md`, `design-pack/scripts/test-check-docs.sh`,
+`design-pack/scripts/test-render.sh`.
+
+1. **`--brief PACKAGE`**, beside `--task`, printing in this fixed order: the `--task` line
+   (`Surfaces`, `Touches red line`, `Contract change`, live `blocked-by`); the `Now` item from
+   `PLAN.md`; every `blocked-by` card in full; the **text** of every spec section the package and
+   the `Now` item cite, resolved through the existing `section_index`; every `D-NNN` entry those
+   texts cite, entry and index line; `docs/layers/<DEP>.md` for each dependency the package names
+   (W10.1); the package's `TRACEABILITY.md` row; every `GAPS.md` row naming the package; and a
+   footer giving the byte count of the brief itself.
+2. It **selects, it never summarises**: every byte it prints is a citation the pack already
+   carries, resolved. A brief that paraphrased would be a second source of truth, and the rule
+   that no statement is untagged would stop at its edge.
+3. `make brief TASK=<PACKAGE>` in `templates/Makefile`, and the same line in the `Commands`
+   section of `templates/AGENTS.md` — the existing `commands` rule requires the two to agree, so
+   this is checked for free.
+4. **Prompt 1 opens with the brief** and names only what the brief does not carry: the source
+   tree. `AGENTS.md`'s reading order becomes "run `make brief`; read `AGENTS.md` and the layer
+   notes it indexes for your dependencies; read the whole of a document only when changing
+   cross-cutting architecture". Playbook §2's task packet becomes the brief's output, which is
+   the first time that section has had a producer.
+5. If Stage C's mechanical pass runs `make brief` once to prove it works, `SKILL.md`
+   `allowed-tools` needs `Bash(make brief *)` and `test-allowed-tools.sh` will say so.
+
+Estimate: 1 day. Second-order benefit, free: the brief's byte count is the per-package reading
+cost, which is the metric this item is judged by (see the closing note).
+
+Acceptance:
+- [ ] `--brief FND-01` on the `test-render.sh` fixture prints every section above, in order, and
+      resolves every citation; a package ID the plan does not define exits non-zero.
+- [ ] a card moved to Resolved changes the brief with no edit to the plan (the `blocked-by`
+      guarantee of W9, now visible in the material).
+- [ ] a spec section renamed but not renumbered still resolves; a dead citation in a cited
+      decision does not crash the brief (it is already refused at the door by W7.1).
+- [ ] `make brief TASK=` with no argument prints the usage line and exits non-zero.
+- [ ] `commands` passes with the new target; `test-render.sh` proves a rendered pack's brief is
+      non-empty for FND-01 and that the whole gate still passes.
+- [ ] prompt 1 no longer names a document whole, except `AGENTS.md`.
+
+### W10.3 — Two living documents have no growth ceiling, and become chronicles
+
+`plan-size` (100 lines) and `agents-size` (20 KB) exist. `GAPS.md` and `TRACEABILITY.md` have
+nothing, and they are the two documents whose cells are *appended to* rather than rewritten. In
+the exemplar this produced `G-001`: one row of one table whose Gap cell is ~20 KB and narrates
+every phase of the project, and Evidence cells in `TRACEABILITY.md` that carry every run since
+2026-09-02. Both are the same mistake — status history written into a register — and both are
+read in full by every session.
+
+The rule the exemplar's own `AGENTS.md` states for `PLAN.md`, "remove completed items, Git is the
+archive", is the right rule for these cells and is nowhere enforced for them.
+
+Fix. Files: `design-pack/templates/scripts/check-docs.py`, `design-pack/templates/GAPS.md`,
+`design-pack/templates/TRACEABILITY.md`, `design-pack/scripts/test-check-docs.sh`.
+
+1. **`gaps-size`**: no cell of a `GAPS.md` row exceeds 2000 characters. Calibrated on the
+   exemplar: its good rows (`G-127`, `G-176`) are 1.0–1.4 KB and read as one gap; the failures
+   are an order of magnitude past it.
+2. **`evidence-size`**: no Evidence cell of `TRACEABILITY.md` exceeds 1000 characters. A cell
+   holds the run that proved the current status — commands and test names — and the template
+   line says the rest is in Git, where a status change is a commit.
+3. Both templates gain the sentence in their header, and the failure message names the rule the
+   row broke rather than the length ("a Gap cell holds one gap, not the history of the packages
+   that narrowed it").
+4. **Reported, not enforced**: the number of distinct package IDs a `GAPS.md` row names, in the
+   informational summary. A row that names five is usually a chronicle, but sometimes it is a
+   gap five slices genuinely narrowed, and that is a judgement — the same treatment
+   `Contract change` gets.
+
+Estimate: ½ day.
+
+Acceptance:
+- [ ] a 3 KB Gap cell fails `gaps-size`; splitting it into two rows passes.
+- [ ] a 2 KB Evidence cell fails `evidence-size`; the same row with the latest run only passes.
+- [ ] the summary reports the package count per gap row and never fails on it.
+- [ ] `test-render.sh` unaffected (the rendered pack has one gap row and empty evidence).
+
+### W10.4 — Prompt 1 has no end other than success, and prompt 2 reviews the session that wrote the code
+
+Two prose changes, one of them load-bearing.
+
+Prompt 1's end condition is "continue until every acceptance condition is demonstrably
+satisfied". There is no other way out. A slice that turns out to be larger than one session
+therefore ends where the context ends — in compaction, where the documents are least likely to
+be truthful — rather than at a boundary the agent chose. The `Notes` section already knows this
+("when a session ends early, ask the agent to leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md`
+truthful"), but it is advice to the *owner*, outside the prompt the agent runs.
+
+Prompt 2 is run by whoever finishes the slice, which in practice is the session that wrote it —
+holding every assumption it is meant to audit. Stage D already answers this in the design phase:
+`stages/hunter.md` is a fresh agent with one mandate and no memory of the elicitation. The review
+pass is the same problem one phase later.
+
+Fix. Files: `design-pack/templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`,
+`design-pack/templates/specs/agent-playbook.md` §10, `design-pack/templates/AGENTS.md`
+(the note under the prompt-selection table).
+
+1. Prompt 1 gains a second exit: *or the session's budget is reached* — then stop at a boundary
+   you choose, leave `PLAN.md`, `GAPS.md` and `TRACEABILITY.md` truthful, write the layer note's
+   Handoff (W10.1), name the next step precisely, and do not begin a sub-task you cannot finish
+   and record.
+2. Prompt 2 states that it runs in a **fresh session**, given the brief of the slice (W10.2) and
+   the diff, never in the session that implemented it, and says why in one sentence citing the
+   same reason Stage D gives.
+
+Estimate: 1 hour. No new rule: this is prose about how a session is run, and there is nothing
+here a snapshot of the repository can assert. `test-render.sh` greps for both sentences.
+
+Acceptance:
+- [ ] both sentences present in a rendered pack (grep in `test-render.sh`).
+- [ ] the prompt-selection table's note says where prompt 2 runs, not only whether.
+
+### W10.5 — A package has no size and no lane, so the plan cannot be split or parallelised (**owner**)
+
+`templates/specs/implementation-plan.md` §Backlog discipline requires every ticket to state its
+"allowed file surface"; the playbook §2 requires the agent to be told "files or modules it may
+change and the known shared-file owner"; the Safe parallelization section names lanes. **None of
+the three is stored anywhere.** A package therefore has no declared size, which is why nothing at
+Stage B notices that a package is three subsystems wide (the exemplar's `GST-04` carries four
+acceptance conditions across preview, publication filtering and the go-live checklist), and no
+orchestrator can tell whether two packages can run at once — so they never do, and the only
+lever left on wall-clock is making one session faster.
+
+This is the one item that reduces elapsed time rather than tokens: three non-overlapping lanes in
+worktrees are three slices in the time of one, and the constraint that makes it safe (never
+parallelise migrations for one aggregate or edits to the contract root) is already written, with
+nothing to evaluate it against.
+
+Fix. Files: `design-pack/templates/specs/implementation-plan.md`,
+`design-pack/templates/scripts/check-docs.py`, `design-pack/stages/B-specify.md`,
+`design-pack/scripts/test-task-policy.sh`.
+
+1. A fourth stored characteristic **`File surface:`** — the modules or directories the package may
+   change — and a fifth, **`Lane:`**, from the lane list the plan already defines. Both are the
+   plan author's **judgement**, like `Contract change`: `task-policy` checks presence and shape
+   and never recomputes them. This keeps W9's four treatments intact rather than adding a fifth
+   kind.
+2. `--brief` prints both, so playbook §2's "files it may change" finally has a value at the
+   moment an agent needs it (W10.2).
+3. Stage B splits a package whose file surface spans more than one lane, or records why it does
+   not; the rule is a sentence in `B-specify.md`, not an assertion, because how wide is too wide
+   is a judgement about the product.
+4. **Reported, not enforced**: packages in the same lane whose file surfaces overlap, printed by
+   `--task all`, so an orchestrator choosing lanes reads it rather than guesses.
+
+Q-W10.5 (owner): where do the two new fields live? In the plan, with the other three, which the
+freeze hard-locks — so a correction costs a `make unlock`. Or in `AGENTS.md`, the free tier,
+where they can be tuned but drift from the contract they describe. Recommendation: **in the
+plan**, on W9's own argument — the characteristics are properties of the package and belong with
+it, the *policy* that reads them is what lives in the free tier, and a file surface that turns
+out to be wrong is exactly the kind of correction that should leave a record. Decision: **in the
+plan (owner, 2026-09-22)** — the recommendation as written. Both fields are stored on the package
+beside the other three, the freeze hard-locks them with the rest of `specs/`, and a correction is
+a `make unlock` with its reason in `UNLOCKS.md`. Estimate: ½ day.
+
+Acceptance:
+- [ ] a package missing `File surface:` or `Lane:` fails `task-policy`; a malformed lane name
+      (one the plan's lane list does not define) fails.
+- [ ] `--task all` reports overlapping file surfaces within a lane and exits zero.
+- [ ] `--brief` prints both fields.
+- [ ] `test-render.sh` proves a rendered pack carries them on every Phase 0 package.
+
+### W10.6 — What a run learns about the tooling has no home either
+
+Smaller than the rest and the same shape. The exemplar's `AGENTS.md` carries, in prose, two
+things that cost a measured session each to discover: that its test runner compacts its output to
+one JSON line when it detects an agent and can print **nothing** at all on a fatal error unless an
+environment variable is set, and that one suite fails about half its runs under the repository's
+own parallelism and passes when run alone — with the instruction not to retry into green. This is
+the highest-value-per-byte knowledge in that file, and in this skill's packs it has nowhere to go
+but a file with a 20 KB ceiling.
+
+Fix: Stage C creates `docs/gotchas.md` (known-flaky gates and the evidence, agent-hostile tool
+output and the flag that fixes it, environment traps), the `Commands` section of
+`templates/AGENTS.md` carries one pointer line to it, and prompt 1 says a gate that fails for an
+environmental reason is recorded there rather than retried. No new rule: nothing about the
+content is mechanically assertable, and a rule requiring a non-empty file would produce
+invented entries. Files: `design-pack/stages/C-operationalize.md`,
+`design-pack/templates/AGENTS.md`, `design-pack/templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`.
+Estimate: ½ hour.
+
+Acceptance:
+- [ ] a rendered pack has `docs/gotchas.md` with its headings and a pointer from `AGENTS.md`.
+- [ ] `test-render.sh` still green.
+
+### Order and measurement
+
+W10.1 before W10.2 (the brief reads the layer notes). W10.3, W10.4 and W10.6 are independent.
+W10.5 last: it touches `task-policy`, which W9 and its follow-up have just stabilised.
+
+The overview measures this method by **owner interventions per work package**, which measures the
+elicitation and says nothing about what a run costs. This item adds a second measure, and
+`--brief` produces it as a by-product: **bytes of brief per package**, and **sessions per
+package** from the layer notes' dated Handoff sections. Both come from the pack itself, neither
+needs the owner, and if they do not fall after W10.1 and W10.2 land, this item did not work.
+On the exemplar's numbers the target is a session that opens on ~35 KB instead of ~1.46 MB.
 
 ---
 
