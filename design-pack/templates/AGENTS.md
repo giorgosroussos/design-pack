@@ -155,11 +155,12 @@ None yet: no package has been delivered. The first one to reach `done` adds its 
 
 ## Prompt selection
 
-`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds three session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Surfaces`, `Touches red line` and `Contract change`; the first two are derived from the sections the package cites and `make check-docs` verifies them, the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four.
+`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds four session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Surfaces`, `Touches red line` and `Contract change`; the first two are derived from the sections the package cites and `make check-docs` verifies them, the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four.
 
 | Prompt | Run when |
 | --- | --- |
-| 1 — Implement | Always. |
+| 1 — Implement | Always, unless an orchestrator runs the package. |
+| 1o — Implement (orchestrated) | Under an orchestrator, in place of prompt 1; prompts 2 and 3 are unchanged. |
 | 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
 | 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness, and there is no security, isolation or contract dimension for a review to add. |
 

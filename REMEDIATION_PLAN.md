@@ -1176,12 +1176,12 @@ session stops more often, and the owner-interventions metric exists to measure e
 Decision: **align Prompt 1 (owner, 2026-10-09)**, the recommendation as written.
 
 Acceptance:
-- [ ] Prompt 1o exists and the policy table names it. `task-policy` passes with it, and fails on
+- [x] Prompt 1o exists and the policy table names it. `task-policy` passes with it, and fails on
       a misspelled prompt name.
-- [ ] Prompt 1o contains no instruction to write `.log/events.jsonl`, `DECISIONS.md`,
+- [x] Prompt 1o contains no instruction to write `.log/events.jsonl`, `DECISIONS.md`,
       `QUESTIONS.md`, `TRACEABILITY.md`, `GAPS.md`, `PLAN.md` or `AGENTS.md`. This is a grep
       test, like the existing prompt checks.
-- [ ] Per Q-W11.2, Prompt 1's assumption clause matches 1o's surface rule.
+- [x] Per Q-W11.2, Prompt 1's assumption clause matches 1o's surface rule.
 
 ### W11.3 — `Depends on:`, the sixth characteristic (B, **owner**)
 

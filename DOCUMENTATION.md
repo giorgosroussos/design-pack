@@ -38,7 +38,8 @@ docs/layers/           one note per delivered work package: what it established,
                        slice must not do, and that session's handoff; AGENTS.md indexes them
 docs/gotchas.md        what the tooling does that an agent cannot predict, empty until it costs
                        a session to learn
-SESSION_BOOTSTRAP_PROMPT_SAMPLE.md   the loop prompts an implementation session starts from
+SESSION_BOOTSTRAP_PROMPT_SAMPLE.md   the loop prompts an implementation session starts from, and
+                       1o, the one a session under an orchestrator starts from
 ```
 
 Three document layers with one rule between them: `specs/` is the frozen contract, `AGENTS.md`

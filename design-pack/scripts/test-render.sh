@@ -694,6 +694,46 @@ else
     report no "11b the fresh-session rule" "the prompt or the table does not say where a review runs"
 fi
 
+# --- 13. prompt 1o: the orchestrated session stages, and stops on a surface ---------
+
+# The 1o block, and every sentence in it that names a shared document: each has to
+# be a "never" or a "read", because 1o writes none of them.
+python3 - > "$work/1o.out" 2>&1 <<'PY1O'
+import re, sys
+t = open("SESSION_BOOTSTRAP_PROMPT_SAMPLE.md", encoding="utf-8").read()
+m = re.search(r"^## 1o\. .*?^```text\n(.*?)^```", t, re.M | re.S)
+if not m:
+    print("no prompt 1o"); sys.exit(1)
+shared = [".log/events.jsonl", "DECISIONS.md", "QUESTIONS.md", "TRACEABILITY.md", "GAPS.md", "PLAN.md", "AGENTS.md"]
+bad = []
+for sentence in re.split(r"(?<=[.:;])\s+(?=[A-Z-])", " ".join(m.group(1).split())):
+    named = [s for s in shared if s in sentence]
+    if named and not re.search(r"\b(never|read|using)\b", sentence, re.I):
+        bad.append(sentence[:120])
+print("\n".join(bad)); sys.exit(1 if bad else 0)
+PY1O
+if [ $? -eq 0 ]; then
+    report ok "13 prompt 1o exists and names a shared document only to say it never writes it, or reads it as the contract" ""
+else
+    report no "13 prompt 1o writes a shared document" "$(cat "$work/1o.out")"
+fi
+
+rule_text='touches data, security, scope, external commitments or UX, it is
+the owner'"'"'s to decide and never this session'"'"'s'
+n="$(python3 -c 'import sys; t=" ".join(open("SESSION_BOOTSTRAP_PROMPT_SAMPLE.md", encoding="utf-8").read().split()); print(t.count(" ".join(sys.argv[1].split())))' "$rule_text")"
+if [ "$n" = "2" ] && ! grep -q 'state the assumption, tag it, and continue' SESSION_BOOTSTRAP_PROMPT_SAMPLE.md \
+   && grep -q 'Do not continue on' SESSION_BOOTSTRAP_PROMPT_SAMPLE.md; then
+    report ok "13b prompt 1 and prompt 1o carry the same surface rule, and the clause that let a session assume is gone" ""
+else
+    report no "13b the surface rule" "found it $n time(s)"
+fi
+
+if grep -q '^| 1o — Implement (orchestrated) |' AGENTS.md; then
+    report ok "13c the prompt-selection table names prompt 1o, and the whole gate reads it (case 1)" ""
+else
+    report no "13c the 1o row" "AGENTS.md has no row for prompt 1o"
+fi
+
 # The ceilings are declared where the documents themselves are, not only in the checker.
 if grep -q 'gaps-size' GAPS.md && grep -q 'evidence-size' TRACEABILITY.md; then
     report ok "11c GAPS.md and TRACEABILITY.md state their own ceilings and why" ""

@@ -140,7 +140,8 @@ The mechanical gates are the floor for every task.
 
 | Prompt | Run when |
 | --- | --- |
-| 1 — Implement | Always. |
+| 1 — Implement | Always, unless an orchestrator runs the package. |
+| 1o — Implement (orchestrated) | Under an orchestrator, in place of prompt 1; prompts 2 and 3 are unchanged. |
 | 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
 | 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness. |
 
@@ -274,6 +275,22 @@ elif grep -q 'no row for prompt 3' "$work/5d.out"; then
     report ok "5d a prompt with no row in the table fails" ""
 else
     report no "5d missing row" "$(cat "$work/5d.out")"
+fi
+
+# Prompt 1o is a real prompt, by its exact name: a misspelling selects nothing.
+fixture
+if rule > "$work/5e.out" 2>&1; then
+    report ok "5e the table's row for prompt 1o, Implement (orchestrated), passes" ""
+else
+    report no "5e prompt 1o" "$(cat "$work/5e.out")"
+fi
+sed -i 's/^| 1o — Implement (orchestrated) |/| 1o — Implement (orchestrate) |/' AGENTS.md
+if rule > "$work/5f.out" 2>&1; then
+    report no "5f a misspelled prompt name" "no failure reported"
+elif grep -q "prompt 1o is 'Implement (orchestrate)'" "$work/5f.out"; then
+    report ok "5f a misspelled prompt name fails, naming the prompt and both spellings" ""
+else
+    report no "5f misspelled 1o" "$(cat "$work/5f.out")"
 fi
 
 # --- 6: blocked-by is live, and reading it writes nothing -----------------------

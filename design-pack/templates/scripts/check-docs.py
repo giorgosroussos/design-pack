@@ -104,7 +104,7 @@ Rules
                 itself says (the surfaces of the cards and register bullets the
                 package's cited sections resolve to, and whether a red line
                 cites a section the package cites); and the prompt-selection
-                table in AGENTS.md names only the three real prompts and only
+                table in AGENTS.md names only the four real prompts and only
                 characteristics this rule defines, so a renamed characteristic
                 or a typo in the table fails the build rather than silently
                 selecting nothing. `Contract change` is a judgement the plan
@@ -148,7 +148,8 @@ BOOLEAN_FIELDS = ["Touches red line", "Contract change"]
 LANE_HEADING = "Safe parallelization"
 LIVE_CHARACTERISTIC = "blocked-by"
 POLICY_HEADING = "Prompt selection"
-PROMPT_NAMES = {"1": "Implement", "2": "Review", "3": "Resolve questions"}
+PROMPT_NAMES = {"1": "Implement", "1o": "Implement (orchestrated)", "2": "Review",
+                "3": "Resolve questions"}
 EMPTY = "\u2014"
 DECISION_FIELDS = ["Type", "Decision", "Why", "Alternatives", "Affected specs"]
 
@@ -1182,7 +1183,7 @@ def allowed_policy_token(token):
 
 
 def check_policy_table(root):
-    """The prompt-selection table names the three real prompts and nothing else."""
+    """The prompt-selection table names the four real prompts and nothing else."""
     path = os.path.join(root, "AGENTS.md")
     if not exists(path):
         return                       # `red-lines` already reports the absence
@@ -1193,7 +1194,7 @@ def check_policy_table(root):
         return
     seen = {}
     for line in table.splitlines():
-        m = re.match(r"^\|\s*(\d+)\s*[\u2014-]\s*([^|]+?)\s*\|(.*)\|\s*$", line)
+        m = re.match(r"^\|\s*(\d+o?)\s*[\u2014-]\s*([^|]+?)\s*\|(.*)\|\s*$", line)
         if not m:
             continue
         number, name, run_when = m.group(1), m.group(2), m.group(3)
