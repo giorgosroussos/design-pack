@@ -1,5 +1,5 @@
 #!/bin/sh
-# Acceptance test for staged work and `make land` (W11.1): a rendered pack,
+# Acceptance test for staged work and `make land` (W11.1, W11.5): a rendered pack,
 # two packages staged on two branches from one base, merged, landed one after the
 # other; then one case per way a landing has to refuse, each proving that a
 # refusal writes nothing.
@@ -279,6 +279,88 @@ else
     report no "13b leftover landing" "$(grep FAIL "$work/p3.out")"
 fi
 git checkout -q -- docs/layers/FND-02.md
+
+# --- staged amendments to a frozen pack (W11.5) ---------------------------------------
+
+unlock() { if [ -n "$HAVE_MAKE" ]; then make -s unlock PATH="$1" REASON="$2"; else sh scripts/unlock.sh "$1" "$2"; fi; }
+unlock .doc-locks "freeze: specs/ becomes hard-locked" > "$work/freeze.out" 2>&1
+printf 'hard-locked: specs/**\n' >> .doc-locks
+commit "freeze" > "$work/freeze-commit.out" 2>&1
+python3 scripts/lock-guard.py --relock --quiet
+
+stage_amendment() {   # stage_amendment <old text>: LDG-02 amends `01` §3, under one spec-amendment
+    mkdir -p .log/pending
+    printf '{"stream":"decisions","type":"decision-added","actor":"agent","payload":{"id":"D-NEW-1","date":"2026-10-09","title":"A total may be cached for one request","type":"spec-amendment","decision":"`01` §3 allows a total cached for the length of one request.","why":"The month view reads one total three times.","alternatives":"Recompute each time (rejected: three scans per view).","affected_specs":"`01` §3."}}\n' > .log/pending/LDG-02.jsonl
+    python3 - "$1" <<'PYEOF'
+import json, sys
+old = sys.argv[1]
+new = "- A monthly total MUST be derived from entries at read time, never stored; it MAY be held for the length of one request. [D-NEW-1]"
+line = {"file": "specs/01-scope-actors.md", "section": "3", "old": old, "new": new, "tag": "[D-NEW-1]", "decision": "D-NEW-1"}
+open(".log/pending/LDG-02.amendments", "w", encoding="utf-8").write(json.dumps(line, ensure_ascii=False) + "\n")
+PYEOF
+    printf '# LDG-02 — monthly totals\n\n## What this package established\n\nTotals per request (D-NEW-1).\n\n## What a later slice must not do\n\nDo not store a total.\n\n## Handoff\n\n### 2026-10-09\n\n- Changed: the totals reader.\n\n## Landing\n\n- traceability: in progress | 2026-10-09: make test (TotalsTest) passed\n' > docs/layers/LDG-02.md
+}
+original='- A monthly total MUST be derived from entries at read time, never stored. [input]'
+
+stage_amendment "$original"
+if python3 scripts/check-docs.py --only pending > "$work/a0.out" 2>&1; then
+    report ok "14 a staged amendment and its spec-amendment pass \`pending\`" ""
+else
+    report no "14 staged amendment form" "$(grep FAIL "$work/a0.out")"
+fi
+
+snapshot > "$work/before"
+if land LDG-02 > "$work/a1.out" 2>&1; then
+    report no "15 an amendment to a hard-locked spec without the ceremony" "land exited 0"
+elif grep -q 'make unlock PATH="specs/01-scope-actors.md" REASON="land LDG-02' "$work/a1.out" \
+     && snapshot | cmp -s - "$work/before"; then
+    report ok "15 an amendment to a hard-locked spec is refused until the owner's ceremony, which the refusal names; nothing changed" ""
+else
+    report no "15 locked amendment" "$(cat "$work/a1.out")"
+fi
+
+if unlock "specs/01-scope-actors.md" "land LDG-02: a total may be held for one request" > "$work/a2u.out" 2>&1 \
+   && land LDG-02 > "$work/a2.out" 2>&1 \
+   && grep -q 'it MAY be held for the length of one request. \[D-009\]$' specs/01-scope-actors.md \
+   && grep -q '^- D-009 — A total may be cached for one request — spec-amendment$' DECISIONS.md \
+   && grep -q 'Totals per request (D-009)' docs/layers/LDG-02.md \
+   && [ ! -e .log/pending/LDG-02.amendments ] && gate > "$work/a2g.out" 2>&1 \
+   && commit "land LDG-02" > "$work/a2c.out" 2>&1; then
+    report ok "16 after one ceremony the amendment lands citing its landed decision, the gate passes and the commit is accepted" ""
+else
+    report no "16 amendment lands" "$(cat "$work/a2u.out" "$work/a2.out" "$work/a2c.out"; grep -E '^FAIL' "$work/a2g.out")"
+fi
+
+stage_amendment "$original"
+unlock "specs/01-scope-actors.md" "land LDG-02 again" > "$work/a3u.out" 2>&1
+snapshot > "$work/before"
+if land LDG-02 > "$work/a3.out" 2>&1; then
+    report no "17 an amendment whose old text is gone" "land exited 0"
+elif grep -q 'the old text is no longer in specs/01-scope-actors.md §3; an earlier landing changed it' "$work/a3.out" \
+     && snapshot | cmp -s - "$work/before"; then
+    report ok "17 an amendment whose old text an earlier landing changed is refused, and nothing is written" ""
+else
+    report no "17 stale amendment" "$(cat "$work/a3.out")"
+fi
+git checkout -q -- . && rm -f .doc-unlock && python3 scripts/lock-guard.py --relock --quiet
+
+python3 - <<'PYEOF'
+import json
+open(".log/pending/LDG-02.amendments", "w", encoding="utf-8").write(json.dumps(
+    {"file": "specs/01-scope-actors.md", "section": "3", "old": "a", "new": "b [D-NEW-2]",
+     "tag": "[D-NEW-2]", "decision": "D-NEW-2"}) + "\n" + json.dumps(
+    {"file": "specs/01-scope-actors.md", "old": "a", "new": "b [input]", "tag": "[input]",
+     "decision": "D-NEW-1"}) + "\n")
+PYEOF
+if python3 scripts/check-docs.py --only pending > "$work/a4.out" 2>&1; then
+    report no "18 malformed amendments" "check-docs passed"
+elif grep -q 'LDG-02.amendments:1: D-NEW-2 is not added by this package' "$work/a4.out" \
+     && grep -q 'LDG-02.amendments:2: lacks section' "$work/a4.out"; then
+    report ok "18 \`pending\` fails an amendment lacking a field, or citing a decision the package does not stage" ""
+else
+    report no "18 amendment form" "$(grep FAIL "$work/a4.out")"
+fi
+rm -rf .log/pending docs/layers/LDG-02.md
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

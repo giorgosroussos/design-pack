@@ -113,7 +113,7 @@ install-hooks: ## Point git at the versioned hooks in .githooks/ and re-apply re
 	python3 scripts/lock-guard.py --relock
 	@echo "hooks active from $$(git config core.hooksPath). The remote needs .githooks/pre-receive installed separately; see .githooks/README.md."
 
-unlock: ## Ceremonial unlock of one hard-locked path: make unlock PATH=<path> REASON="why"
+unlock: ## Ceremonial unlock of hard-locked paths: make unlock PATH="<path> [<path> ...]" REASON="why"
 	@target='$(or $(TARGET),$(PATH))'; \
 	 case "$$target" in *:*) target='' ;; esac; \
 	 PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'; export PATH; \

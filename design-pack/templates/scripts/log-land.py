@@ -8,6 +8,9 @@ and never edits the documents every package shares (see the staging section of
 
   .log/pending/<PACKAGE>.jsonl       the events it would have appended, IDs as
                                      placeholders (D-NEW-1, Q-NEW-1, ...)
+  .log/pending/<PACKAGE>.amendments  the spec amendments it needs, one JSON
+                                     object per line: file, section, old, new,
+                                     tag, decision
   docs/layers/<PACKAGE>.md           its layer note, whose `## Landing` section
                                      holds its updates to the shared documents
 
@@ -15,15 +18,16 @@ and never edits the documents every package shares (see the staging section of
 orchestrator integrates them. It:
 
   1. validates every staged event with the checks `log-append.py` applies, and
-     every landing line, before it writes anything;
+     every staged amendment and landing line, before it writes anything;
   2. assigns the next contiguous real IDs in staged order (D-, Q-, and G- for a
      gap row the package adds) and rewrites the placeholders in the events, the
-     landing lines and the layer note;
+     amendments, the landing lines and the layer note;
   3. appends the events through the same functions `log-append.py` uses, so
      there is one writer and one set of refusals;
-  4. rebuilds DECISIONS.md and QUESTIONS.md, applies the landing lines to
-     TRACEABILITY.md, GAPS.md and PLAN.md, and adds the package's line to the AGENTS.md "Layer notes" index when it lands `done`;
-  5. removes the staging file and the `## Landing` section.
+  4. rebuilds DECISIONS.md and QUESTIONS.md, applies the amendments to the specs
+     and the landing lines to TRACEABILITY.md, GAPS.md and PLAN.md, and adds the
+     package's line to the AGENTS.md "Layer notes" index when it lands `done`;
+  5. removes the staging files and the `## Landing` section.
 
 On any refusal it exits non-zero having changed nothing: every new file content
 is computed in memory first, and the first write happens only once all of it is.
@@ -36,11 +40,17 @@ Landing lines, one per bullet under `## Landing`, cells separated by ` | `:
   - gap-retire: G-NNN
   - plan-remove                                  this package's `Now` item in PLAN.md
 
+A spec file that is hard-locked (a frozen pack) is amended only once the owner
+has run the ceremony for it: `make unlock PATH="<every file the package amends>"
+REASON="..."`, one ceremony per landed package. The commit that follows the
+landing consumes the token, as it does for any unlock.
+
 Exit status: 0 landed, 2 usage or refused, 3 the chain does not verify.
 """
 
 import argparse
 import datetime
+import importlib.util
 import os
 import re
 import subprocess
@@ -55,6 +65,7 @@ STATUSES = ("not started", "in progress", "done")
 EVIDENCE_MAX_CHARS = 1000
 GAP_CELL_MAX_CHARS = 2000
 EMPTY_INDEX_RE = re.compile(r"^None yet\b.*$", re.M)
+SPEC_HEADING_RE = re.compile(r"^(#{2,4})\s+(\d+(?:\.\d+)*)\.?\s+(.*)$")
 
 
 class Refused(Exception):
@@ -68,6 +79,16 @@ def now():
 def read(path):
     with open(path, encoding="utf-8") as fh:
         return fh.read()
+
+
+def load_module(name, filename):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if not os.path.isfile(path):
+        return None
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 # --- the layer note's `## Landing` section ------------------------------------
@@ -216,6 +237,81 @@ def note_title(note, package):
     return m.group(1)
 
 
+# --- spec amendments ------------------------------------------------------------
+
+def section_span(text, section):
+    """(start, end) offsets of `section` in a spec's text, subsections included."""
+    lines = text.split("\n")
+    offsets, pos = [], 0
+    for line in lines:
+        offsets.append(pos)
+        pos += len(line) + 1
+    start = end = None
+    for i, line in enumerate(lines):
+        m = SPEC_HEADING_RE.match(line)
+        if not m:
+            continue
+        number = m.group(2)
+        if start is None and number == section:
+            start = offsets[i]
+            continue
+        if start is not None and not number.startswith(section + "."):
+            end = offsets[i]
+            break
+    if start is None:
+        return None
+    return start, (end if end is not None else len(text))
+
+
+def lock_state(root):
+    """A function path -> (tier, unlocked) from the pack's own manifest and token."""
+    guard = load_module("lockguard", "lock-guard.py")
+    manifest = os.path.join(root, ".doc-locks")
+    if guard is None or not os.path.isfile(manifest):
+        return lambda path: ("free", True)
+    rules = guard.parse_manifest_text(read(manifest), manifest)
+    token = os.path.join(root, guard.DEFAULT_TOKEN)
+    unlocked = guard.read_token(read(token)) if os.path.isfile(token) else set()
+
+    def state(path):
+        tier = guard.tier_of(path, rules)[0]
+        return tier, (tier != "hard-locked" or path in unlocked)
+    return state
+
+
+def apply_amendments(root, package, amendments, texts):
+    """New text per spec file, in `texts` (path -> text), amendments in staged order."""
+    state = lock_state(root)
+    locked = sorted(set(a["file"] for _, a in amendments
+                        if not state(a["file"])[1]))
+    if locked:
+        raise Refused("%s amends %s, hard-locked in this pack. The owner runs one ceremony for "
+                      "the whole package, then lands it:\n  make unlock PATH=\"%s\" REASON=\"land "
+                      "%s: <what the amendments change and why>\"\n  make land TASK=%s"
+                      % (package, ", ".join(locked), " ".join(locked), package, package))
+    for lineno, a in amendments:
+        path = os.path.join(root, a["file"])
+        if a["file"] not in texts:
+            if not os.path.isfile(path):
+                raise Refused("amendment line %d: %s is not a file" % (lineno, a["file"]))
+            texts[a["file"]] = read(path)
+        text = texts[a["file"]]
+        span = section_span(text, a["section"])
+        if span is None:
+            raise Refused("amendment line %d: %s has no section %s" % (lineno, a["file"], a["section"]))
+        body = text[span[0]:span[1]]
+        count = body.count(a["old"])
+        if count == 0:
+            raise Refused("amendment line %d: the old text is no longer in %s §%s; an earlier "
+                          "landing changed it. Re-derive the amendment against the section as it "
+                          "now reads, and stage it again" % (lineno, a["file"], a["section"]))
+        if count > 1:
+            raise Refused("amendment line %d: the old text occurs %d times in %s §%s; quote "
+                          "enough of the statement to name one" % (lineno, count, a["file"], a["section"]))
+        texts[a["file"]] = text[:span[0]] + body.replace(a["old"], a["new"], 1) + text[span[1]:]
+    return texts
+
+
 # --- ID assignment ----------------------------------------------------------------
 
 def next_gap_number(root, gaps_text):
@@ -255,18 +351,22 @@ def assign(staged_ids, gap_placeholders, records, next_gap):
 def land(root, package, ts):
     """Compute everything, then write it. Returns the report lines."""
     events_path = eventlog.pending_path(root, package)
+    amend_path = eventlog.pending_path(root, package, ".amendments")
     note_path = os.path.join(root, LAYERS_DIR, "%s.md" % package)
     note = read(note_path) if os.path.isfile(note_path) else None
     landing = landing_section(note) if note is not None else None
-    if not os.path.isfile(events_path) and landing is None:
-        raise Refused("%s has nothing staged: no %s and no `## Landing` section in %s"
+    if not os.path.isfile(events_path) and not os.path.isfile(amend_path) and landing is None:
+        raise Refused("%s has nothing staged: no %s, no %s and no `## Landing` section in %s"
                       % (package, os.path.relpath(events_path, root),
-                         os.path.relpath(note_path, root)))
+                         os.path.relpath(amend_path, root), os.path.relpath(note_path, root)))
 
     # Form: the same checks `check-docs` (`pending`) runs, refused here too, so a
     # landing never depends on the gate having been run first.
     staged = eventlog.read_jsonl(events_path) if os.path.isfile(events_path) else []
     problems = eventlog.staged_problems(staged)
+    amend_lines = eventlog.read_jsonl(amend_path) if os.path.isfile(amend_path) else []
+    problems += [(n, "amendments: " + m) for n, m in
+                 eventlog.amendment_problems(amend_lines, eventlog.staged_additions(staged))]
     if problems:
         raise Refused("the staged work is not well-formed:\n  %s"
                       % "\n  ".join("line %d: %s" % p for p in problems))
@@ -328,6 +428,10 @@ def land(root, package, ts):
         writes["DECISIONS.md"] = eventlog.render_decisions(folded)
         writes["QUESTIONS.md"] = eventlog.render_questions(folded)
 
+    if amend_lines:
+        amendments = [(n, eventlog.substitute(obj, mapping)) for n, obj, _ in amend_lines]
+        writes.update(apply_amendments(root, package, amendments, {}))
+
     status = None
     for kind, cells in lines:
         cells = [eventlog.substitute(c, mapping) for c in cells]
@@ -364,9 +468,10 @@ def land(root, package, ts):
         with open(os.path.join(root, rel), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)
     removed = []
-    if os.path.isfile(events_path):
-        os.remove(events_path)
-        removed.append(os.path.relpath(events_path, root))
+    for path in (events_path, amend_path):
+        if os.path.isfile(path):
+            os.remove(path)
+            removed.append(os.path.relpath(path, root))
 
     report = []
     if new_records:
@@ -381,8 +486,8 @@ def land(root, package, ts):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Land one package's staged events and document "
-                                             "updates.")
+    ap = argparse.ArgumentParser(description="Land one package's staged events, amendments and "
+                                             "document updates.")
     ap.add_argument("package", help="the work package ID, e.g. LDG-01")
     ap.add_argument("--root", default=".", help="repository root (default: current directory)")
     ap.add_argument("--ts", default=None, help="ISO-8601 UTC timestamp of the records (default: now)")

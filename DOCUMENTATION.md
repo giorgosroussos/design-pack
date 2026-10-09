@@ -309,7 +309,9 @@ make unlock PATH=docs/inputs/requirements.md REASON="the owner sent a corrected 
 It refuses any path the manifest does not call hard-locked, appends a record to `UNLOCKS.md` and
 stages it so the change and its reason travel in one commit, makes the file writable, and writes
 a single-use token the guard accepts for exactly that path. The next commit consumes it: the file
-returns to `0444` and the token is deleted. One ceremony, one deliberate change.
+returns to `0444` and the token is deleted. One ceremony, one deliberate change. Several paths one
+reason covers — every spec a landed package amends — go in one ceremony, `PATH="<path> <path>"`,
+with a record per path; one path that is not hard-locked refuses the whole ceremony.
 
 Two evidence paths exist because the server never sees the token: the token satisfies the local
 hook, and the `UNLOCKS.md` record added in the same diff satisfies the push (see the limits above:

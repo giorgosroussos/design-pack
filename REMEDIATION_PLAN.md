@@ -1281,14 +1281,14 @@ commit. Decision: **the owner, once per landed package (owner, 2026-10-09)**, th
 as written.
 
 Acceptance:
-- [ ] An amendment staged on a frozen pack is refused by `land` until the file is unlocked, and
+- [x] An amendment staged on a frozen pack is refused by `land` until the file is unlocked, and
       the refusal names the `make unlock` to run. After `make unlock` of every path in one
       command, the amendment lands, and the decision it cites is the landed ID.
-- [ ] An amendment whose old text an earlier landing changed is refused, and nothing is written.
-- [ ] `make unlock PATH="a b" REASON=...` records one line per path with the same reason and
+- [x] An amendment whose old text an earlier landing changed is refused, and nothing is written.
+- [x] `make unlock PATH="a b" REASON=...` records one line per path with the same reason and
       authorizes both paths for one commit. A path that is not hard-locked refuses the whole
       ceremony and records nothing.
-- [ ] `pending` fails an amendment line that lacks a field or names a decision the staging file
+- [x] `pending` fails an amendment line that lacks a field or names a decision the staging file
       does not add.
 
 ### W11.6 — `Surfaces` does not discriminate (C, **owner**)

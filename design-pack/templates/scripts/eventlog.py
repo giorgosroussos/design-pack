@@ -295,10 +295,13 @@ def write_records(root, new_records):
 # a placeholder numbered per package, `D-NEW-1` or `Q-NEW-1`, and so does any
 # event or text that refers to it. `log-land.py` turns the staging file into
 # records, one package at a time, after the package integrates; `check-docs`
-# (`pending`) holds the form in between.
+# (`pending`) holds the form in between. `<PACKAGE>.amendments` beside it holds
+# the spec amendments, staged for the same reason (one JSON object per line,
+# AMENDMENT_KEYS).
 
 PENDING_DIR = os.path.join(LOG_DIR, "pending")
 STAGED_KEYS = ("stream", "type", "actor", "payload")
+AMENDMENT_KEYS = ("file", "section", "old", "new", "tag", "decision")
 PLACEHOLDER_RE = re.compile(r"\b([DQG])-NEW-([1-9]\d*)\b")
 PLACEHOLDER_ANY_RE = re.compile(r"\b[DQG]-NEW[-\w]*")
 STREAM_EVENTS = {DECISIONS_STREAM: DECISION_EVENTS, QUESTIONS_STREAM: CARD_EVENTS}
@@ -431,6 +434,64 @@ def staged_problems(lines):
         except LogError as exc:
             problems.append((lineno, str(exc)))
     return sorted(set(problems))
+
+
+def staged_additions(lines):
+    """{placeholder: (stream, type, payload)} for the records a staging file adds."""
+    out = {}
+    for _, obj, error in lines:
+        if error or not isinstance(obj, dict) or not isinstance(obj.get("payload"), dict):
+            continue
+        if (obj.get("stream"), obj.get("type")) in ADDS:
+            out[str(obj["payload"].get("id", ""))] = (obj["stream"], obj["type"], obj["payload"])
+    return out
+
+
+def amendment_problems(lines, additions):
+    """(line, message) for every staged amendment that is not well-formed.
+
+    An amendment is the exact old text and the new text of one statement in one
+    section of one spec, the provenance tag the new text carries, and the
+    placeholder of the `spec-amendment` decision staged beside it. Whether the
+    old text is still there is a question for landing time, when an earlier
+    package may have changed it; this is the form only.
+    """
+    problems = []
+    for lineno, obj, error in lines:
+        if error:
+            problems.append((lineno, error))
+            continue
+        missing = [k for k in AMENDMENT_KEYS if not isinstance(obj.get(k), str) or not obj[k].strip()]
+        if missing:
+            problems.append((lineno, "lacks %s; an amendment carries %s"
+                             % (", ".join(missing), ", ".join(AMENDMENT_KEYS))))
+            continue
+        extra = sorted(set(obj) - set(AMENDMENT_KEYS))
+        if extra:
+            problems.append((lineno, "carries %s, which an amendment does not have" % ", ".join(extra)))
+        if not obj["file"].startswith("specs/"):
+            problems.append((lineno, "file %r is not under specs/; only spec text is amended"
+                             % obj["file"]))
+        if obj["old"] == obj["new"]:
+            problems.append((lineno, "old and new text are the same"))
+        tag = obj["tag"]
+        if not re.fullmatch(r"\[[^\[\]]+\]", tag):
+            problems.append((lineno, "tag %r is not a provenance tag in brackets" % tag))
+        elif tag not in obj["new"]:
+            problems.append((lineno, "the new text does not carry its tag %s; an amended "
+                                     "statement keeps or gains its provenance" % tag))
+        decision = obj["decision"]
+        if not re.fullmatch(r"D-NEW-[1-9]\d*", decision):
+            problems.append((lineno, "decision %r is not a D-NEW-n placeholder; the amendment's "
+                                     "decision is staged beside it and lands with it" % decision))
+            continue
+        added = additions.get(decision)
+        if added is None:
+            problems.append((lineno, "%s is not added by this package's staging file" % decision))
+        elif added[2].get("type") != "spec-amendment":
+            problems.append((lineno, "%s is a %r decision; an amendment cites a spec-amendment"
+                             % (decision, added[2].get("type"))))
+    return problems
 
 
 # --- event validation --------------------------------------------------------

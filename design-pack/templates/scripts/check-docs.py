@@ -94,7 +94,8 @@ Rules
                 every line of `.log/pending/<PACKAGE>.jsonl` is an event of a
                 known stream with exactly stream, type, actor and payload; every
                 record it adds carries a `D-NEW-n` / `Q-NEW-n` placeholder and
-                never a real ID; and a package
+                never a real ID; every `.amendments` line has its six fields and
+                cites a spec-amendment the same package stages; and a package
                 that TRACEABILITY.md calls `done` has no staging file and no
                 `## Landing` section left, because landing removes both
   commands      every `make <target>` listed in AGENTS.md "Commands" is a target
@@ -934,8 +935,8 @@ def check_layer_notes(root, pkgs, rows):
 
 # --- staged work ------------------------------------------------------------------
 #
-# Under an orchestrator a session stages its events and its updates
-#  to the shared documents instead of writing them (the staging section of
+# Under an orchestrator a session stages its events, its spec amendments and its
+# updates to the shared documents instead of writing them (the staging section of
 # eventlog.py says why), and `make land` applies them after the package
 # integrates. This rule holds the form in between, so a staging file that could
 # never land fails the gate on the branch that wrote it, not on the day it lands.
@@ -959,9 +960,9 @@ def check_pending(root, pkgs, rows):
         for name in sorted(os.listdir(pending)):
             rel = "%s/%s" % (os.path.relpath(pending, root), name)
             package, suffix = os.path.splitext(name)
-            if suffix != ".jsonl":
+            if suffix not in (".jsonl", ".amendments"):
                 fail("pending", rel, "not a staging file; `.log/pending/` holds `<PACKAGE>.jsonl` "
-                     "only")
+                     "and `<PACKAGE>.amendments` only")
                 continue
             files += 1
             if pkgs and package not in pkgs:
@@ -973,7 +974,13 @@ def check_pending(root, pkgs, rows):
                 fail("pending", rel, "scripts/eventlog.py is missing; the staged form cannot be read")
                 continue
             lines = eventlog.read_jsonl(os.path.join(pending, name))
-            problems = eventlog.staged_problems(lines)
+            if suffix == ".jsonl":
+                problems = eventlog.staged_problems(lines)
+            else:
+                sibling = os.path.join(pending, package + ".jsonl")
+                additions = eventlog.staged_additions(
+                    eventlog.read_jsonl(sibling)) if exists(sibling) else {}
+                problems = eventlog.amendment_problems(lines, additions)
             for lineno, msg in problems:
                 fail("pending", "%s:%d" % (rel, lineno), msg)
     for package in sorted(done):

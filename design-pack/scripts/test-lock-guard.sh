@@ -280,6 +280,45 @@ else
 fi
 chmod u+w docs/inputs/requirements.md docs/inputs/second.md 2>/dev/null || true
 
+# --- 4i. one ceremony, several paths, one reason (landing a package) ----------
+# A package whose staged amendments touch two specs lands under one owner
+# decision. One command, one reason, a record per path, one token, one commit.
+
+if unlock_cmd "docs/inputs/requirements.md docs/inputs/second.md" "land PKG-07: two amendments"; then
+    n="$(grep -c 'reason="land PKG-07: two amendments"' UNLOCKS.md)"
+    printf 'Amended at landing.\n' >> docs/inputs/requirements.md
+    printf 'Amended at landing.\n' >> docs/inputs/second.md
+    git add docs/inputs/requirements.md docs/inputs/second.md
+    if [ "$n" = "2" ] && guard; then
+        report ok "4i one ceremony over two paths records a line per path with the one reason, and authorizes both" ""
+    else
+        report no "4i multi-path ceremony" "records: $n; $(cat "$work/guard.out" 2>/dev/null)"
+    fi
+    git commit -q -m "land PKG-07" >/dev/null 2>&1
+    m1="$(ls -l docs/inputs/requirements.md | cut -c1-10)"
+    m2="$(ls -l docs/inputs/second.md | cut -c1-10)"
+    if [ ! -e .doc-unlock ] && [ "$m1" = "-r--r--r--" ] && [ "$m2" = "-r--r--r--" ]; then
+        report ok "4i2 the token is single-use for the whole ceremony: one commit consumes it and re-locks both" ""
+    else
+        report no "4i2 multi-path token" "token left: $([ -e .doc-unlock ] && echo yes || echo no); modes $m1 $m2"
+    fi
+else
+    report no "4i multi-path ceremony" "$(cat "$work/unlock.out")"
+fi
+
+# One path that is not hard-locked refuses the whole ceremony, before anything is written.
+cp UNLOCKS.md "$work/unlocks.before"
+if unlock_cmd "docs/inputs/requirements.md Makefile" "land PKG-08: a free path slipped in"; then
+    report no "4j a free path among locked ones" "the ceremony went through"
+elif grep -q "Makefile is 'free', not hard-locked" "$work/unlock.out" \
+     && cmp -s UNLOCKS.md "$work/unlocks.before" && [ ! -e .doc-unlock ] \
+     && [ "$(ls -l docs/inputs/requirements.md | cut -c1-10)" = "-r--r--r--" ]; then
+    report ok "4j a path that is not hard-locked refuses the whole ceremony: no record, no token, nothing writable" ""
+else
+    report no "4j partial ceremony" "$(cat "$work/unlock.out")"
+fi
+chmod u+w docs/inputs/requirements.md docs/inputs/second.md 2>/dev/null || true
+
 # --- 4f. the ceremony when the commit deletes the unlocked path ---------------
 # post-commit must consume the token even when there is nothing left to re-lock.
 
