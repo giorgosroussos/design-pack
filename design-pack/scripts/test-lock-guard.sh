@@ -368,6 +368,32 @@ else
     report ok "5b the bypassed commit is caught by the server-side check" ""
 fi
 
+# --- 5c. the CI job: the same check over a branch, where no pre-receive runs ------
+# On github.com no custom pre-receive hook can be installed, so FND-02's CI job runs
+# `make check-locks BASE=<target branch>`, which hands the range to pre-receive itself.
+
+ci_locks() {   # ci_locks <base>: what the CI job runs, from the current HEAD
+    if [ -n "$HAVE_MAKE" ]; then make -s check-locks BASE="$1"
+    else printf '%s %s refs/heads/check-locks\n' "$(git merge-base "$1" HEAD)" "$(git rev-parse HEAD)" | sh .githooks/pre-receive; fi
+}
+if ci_locks HEAD~1 > "$work/ci1.out" 2>&1; then
+    report no "5c the CI job over the bypassed commit" "check-locks BASE= accepted it"
+elif grep -q 'append-only' "$work/ci1.out"; then
+    report ok "5c make check-locks BASE=<rev> refuses the bypassed commit, judged by the base's manifest" ""
+else
+    report no "5c CI check-locks" "$(cat "$work/ci1.out")"
+fi
+
+here_ref="$(git rev-parse --abbrev-ref HEAD)"
+landed="$(git log --format=%H --grep='land PKG-07' -1)"
+git checkout -q "$landed" 2>/dev/null
+if ci_locks "$landed~1" > "$work/ci2.out" 2>&1; then
+    report ok "5d the same job accepts a locked change that carries its UNLOCKS.md record" ""
+else
+    report no "5d CI check-locks over a ceremony" "$(cat "$work/ci2.out")"
+fi
+git checkout -q "$here_ref" 2>/dev/null
+
 # --- 7. the manifest may only tighten ------------------------------------------
 # W3: appending a demotion is a legal append, so the guard compares the manifest
 # before and after the change and refuses any path whose tier would go down.

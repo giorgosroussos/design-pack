@@ -757,6 +757,17 @@ else
     report no "13d Q-W11.6" "AGENTS.md does not say it"
 fi
 
+# --- 14. the server half where the host takes no pre-receive hook (W11.7) -----------
+
+if grep -q 'A `check-locks` job on every merge request runs `make check-locks BASE=<the target branch>`' specs/07-implementation-plan.md \
+   && grep -q 'required status check' .githooks/README.md \
+   && grep -q 'on github.com the' .githooks/README.md \
+   && grep -q 'lock-guard.py --relock` in it' .githooks/README.md; then
+    report ok "14 FND-02 carries the CI check-locks job, and the hooks README names CI as the server half and says what a worktree needs" ""
+else
+    report no "14 CI lock job" "FND-02 or .githooks/README.md does not say it"
+fi
+
 # The ceilings are declared where the documents themselves are, not only in the checker.
 if grep -q 'gaps-size' GAPS.md && grep -q 'evidence-size' TRACEABILITY.md; then
     report ok "11c GAPS.md and TRACEABILITY.md state their own ceilings and why" ""

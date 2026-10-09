@@ -53,7 +53,7 @@ bash design-pack/scripts/test-land.sh
 | W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
 | W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | done |
-| W11 | Parallel execution under an orchestrator | B — orchestration; 6 owner decisions | ~4 days | in progress |
+| W11 | Parallel execution under an orchestrator | B — orchestration; 6 owner decisions | ~4 days | done |
 | W12 | Prompt 2's selection does not discriminate | C — measured, owner | ? | not started |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
@@ -1043,14 +1043,15 @@ On the exemplar's numbers the target is a session that opens on ~35 KB instead o
 
 ## W11 — Parallel execution under an orchestrator
 
-Status: in progress
-Decision: the four owner questions asked up front were decided on 2026-10-09. **The owner
-accepted all four recommendations as written**: Q-W11.1, placeholders only in the staging file
-and the package's own layer note; Q-W11.2, Prompt 1 is aligned with 1o; Q-W11.3, `Depends on:`
-is stored in the plan; Q-W11.5, the owner runs one unlock per landed package. The work raised a
-fifth question, Q-W11.4. The wave checks hold only for `Now` items that carry a `Branch:`, and
-the owner decided it the same day (see W11.4). Q-W11.6 is measured before it is asked, as the
-item says.
+Status: done
+Decision: all six owner questions were decided on 2026-10-09.
+- The four asked up front: **the owner accepted all four recommendations as written**. Q-W11.1,
+  placeholders only in the staging file and the package's own layer note; Q-W11.2, Prompt 1 is
+  aligned with 1o; Q-W11.3, `Depends on:` is stored in the plan; Q-W11.5, the owner runs one
+  unlock per landed package.
+- Q-W11.4, raised by the work: the wave checks hold only for `Now` items that carry a `Branch:`.
+- Q-W11.6, measured on dnd-vtt first: the owner chose **B**, and the discrimination problem
+  becomes its own item, W12.
 
 W9 told an orchestrator *which* prompts a package needs, and W10.5 told it *whether* two packages
 can run at once (`File surface:`, `Lane:`, and the overlaps `--task all` reports). Nothing yet
@@ -1367,10 +1368,10 @@ config, so the pre-commit guard runs in every worktree, but the read-only modes 
 so the orchestrator runs `lock-guard.py --relock` in each worktree.
 
 Acceptance:
-- [ ] `make check-locks BASE=<rev>` judges the range from the merge base to `HEAD` with the
+- [x] `make check-locks BASE=<rev>` judges the range from the merge base to `HEAD` with the
       base's manifest. It refuses a locked change with no recorded reason, and accepts the same
       change carrying its `UNLOCKS.md` record.
-- [ ] The rendered FND-02 names the job, and `.githooks/README.md` names CI as the server half
+- [x] The rendered FND-02 names the job, and `.githooks/README.md` names CI as the server half
       and carries the worktree sentence.
 
 ### Migrating an existing pack to W10/W11
@@ -1902,3 +1903,79 @@ Append-only. One entry per session per item touched. Form:
   lookup and watching the suite fail with that name, then restoring it.
 - Left open: W8.1's live run, which is the owner's, and the `Decision:` line recording where the
   permission-grant offer belongs. Nothing else in W8.
+
+### 2026-10-09 — W11 — done (six owner decisions; W12 opened from Q-W11.6)
+- Changed: **W11.1**
+  - New `templates/scripts/log-land.py` (`make land TASK=`).
+  - `eventlog.py` gains the one write path that `log-append.py` and `log-land.py` now share
+    (`admit`, `chain_onto`, `write_records`; the dead-citation check moved there from
+    `log-append.py`), and the staging format with its form checks (`staged_problems`,
+    `amendment_problems`).
+  - `check-docs.py` gains the `pending` rule.
+  - `.doc-locks` gains `free: .log/pending/**`.
+  - `Makefile` and `AGENTS.md` Commands gain `land`.
+  - `log-README.md` gains §Staged events.
+  - Stage C copies `log-land.py`.
+  - `test-render.sh --render-to DIR` renders the pack for other suites.
+
+  **W11.2**
+  - Prompt 1o is added beside Prompt 1.
+  - Prompt 1's assumption clause is replaced by 1o's surface rule.
+  - The policy table gains the `1o` row, and `task-policy` accepts `1o — Implement
+    (orchestrated)` by its exact name.
+
+  **W11.3**
+  - `Depends on:` becomes the sixth characteristic. It must stay inside the phase and form no
+    cycle, and the contract pair is derived. When two contract packages share a section, one of
+    them lists the other, because requiring both directions would require a cycle.
+  - `--task` and `--brief` print it, and `--task all` prints each phase's order in levels.
+  - The plan template, Stage B B5.1 and the FND characteristics are updated.
+
+  **W11.4**
+  - `PLAN.md` `Now` items carry `Lane:` and `Branch:` (`{{FND01_LANE}}`).
+  - New `check_wave`. A `Lane:` is checked against the plan's lane on every item. The three wave
+    checks hold only for items whose `Branch:` is not a dash (Q-W11.4).
+
+  **W11.5**
+  - Amendments are staged as `.log/pending/<PACKAGE>.amendments` and landed by `log-land.py`.
+  - A hard-locked spec is refused, with the exact `make unlock` to run, until the package's one
+    ceremony.
+  - Old text that is no longer there is refused.
+  - `unlock.sh` accepts several paths with one reason. Every path is checked first, so one that
+    is not hard-locked refuses the whole ceremony.
+
+  **W11.6**
+  - Measured on dnd-vtt; the owner decided B.
+  - One paragraph under the table in `templates/AGENTS.md`.
+
+  **W11.7**
+  - `make check-locks BASE=<rev>` hands the range from the merge base to `pre-receive` itself.
+  - FND-02 gains the CI `check-locks` job.
+  - `.githooks/README.md` names CI as the server half on github.com, says to make the job a
+    required status check, and gains the worktree section.
+
+  Docs: `SKILL.md` files table, `reference/events-and-rules.md` (the `pending` and `now-items`
+  rows, `task-policy`), and `DOCUMENTATION.md` (§1, §4.5, §5, the gates, files and suite
+  tables).
+- Proved by: nine suites green, 31 + 17 + 34 + 39 + 42 + 2 + 11 + 38 + 19 = 233 cases, up from
+  187.
+  - New `test-land.sh` (19): two packages staged on two branches of one rendered base, merged
+    with no conflict, then landed in turn. The chain verifies. The IDs run D-006, then D-007 and
+    D-008, then Q-003, and the notes and the cross-references between events carry their real
+    IDs. The gate passes. Each refusal leaves the tree byte-identical. Amendments are refused,
+    then landed, then refused again as stale.
+  - `test-task-policy.sh` +9: 1o's row and a misspelling of it; the derived dependency pair,
+    satisfied, printed and briefed; two contract packages; a cycle; a dependency across phases.
+  - `test-check-docs.sh` +7: the wave.
+  - `test-render.sh` +6: `Depends on` everywhere with each phase's order; 1o's shared-document
+    grep, shown to bite by planting "Update PLAN.md" in the block; the shared surface rule; the
+    1o row; Q-W11.6's sentence; the CI job and the README.
+  - `test-lock-guard.sh` +5: the multi-path ceremony and its refusal; CI `check-locks` refusing
+    a bypassed commit and accepting a recorded one.
+- Left open:
+  - W12 (owner).
+  - The migration of dnd-vtt to W10/W11. That is the owner's change to the owner's pack, so it is
+    described under W11 and not run from here.
+  - The template's `AGENTS.md` grew by about 2 KB: the 1o row, the wave sentence and the Q-W11.6
+    paragraph. The fixture renders at 17.1 KB against the 20 KB ceiling, so a pack with many red
+    lines has less headroom than it had.

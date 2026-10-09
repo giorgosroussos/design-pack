@@ -97,6 +97,7 @@ Goal: a reproducible repository, one command that runs every gate, CI that runs 
 - `make check-docs` runs as its own job.
 - Every gate the testing specification requires but nothing implements yet is a failing-forward tripwire: a job that passes only while the gate is provably absent and fails with promotion instructions the moment it becomes runnable. A missing gate and a silently passing gate must never look alike.
 - Dependency and secret scanning; artifact and cache strategy; no job retries.
+- A `check-locks` job on every merge request runs `make check-locks BASE=<the target branch>`: the lock guard over the request's diff, judged by the target branch's `.doc-locks`, which is the rule the `pre-receive` hook applies. The owner makes it a required status check. On a host where custom `pre-receive` hooks cannot be installed (github.com), this job is the server half of the lock layer (`.githooks/README.md`).
 {{FND02_CHARACTERISTICS}}
 
 <!-- if:API -->

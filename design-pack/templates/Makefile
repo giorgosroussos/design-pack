@@ -104,8 +104,16 @@ brief: ## Everything a session working on one package has to read: brief TASK=<P
 check-docs: verify-chain ## Mechanical consistency of the documentation layer
 	python3 scripts/check-docs.py
 
-check-locks: ## Lock manifest check of the staged change (what the pre-commit hook runs)
-	python3 scripts/lock-guard.py --staged
+# With BASE=<rev>, `check-locks` judges every commit since the merge base of BASE and
+# HEAD, with BASE's own manifest and guard, by handing the range to .githooks/pre-receive:
+# the same rule the server hook applies, run where a server hook cannot be installed
+# (github.com). This is the CI job FND-02 adds and the owner makes a required check.
+check-locks: ## Lock manifest check of the staged change; BASE=<rev> checks a branch since its merge base (CI)
+	@if [ -n "$(BASE)" ]; then \
+	   base="$$(git merge-base '$(BASE)' HEAD)" || exit 2; \
+	   printf '%s %s refs/heads/check-locks\n' "$$base" "$$(git rev-parse HEAD)" | sh .githooks/pre-receive && \
+	   echo "check-locks: clean from $$base to HEAD (the manifest and guard of $(BASE))"; \
+	 else python3 scripts/lock-guard.py --staged; fi
 
 install-hooks: ## Point git at the versioned hooks in .githooks/ and re-apply read-only modes (once per clone)
 	git config core.hooksPath .githooks

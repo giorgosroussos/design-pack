@@ -121,7 +121,7 @@ make smoke          # health of the running system through its public entry poin
 make audit          # dependency advisories
 make scan-secrets   # secret scan of everything Git tracks
 make check-docs     # mechanical consistency of the documentation layer (scripts/check-docs.py)
-make check-locks    # lock manifest check of the staged change (scripts/lock-guard.py)
+make check-locks    # lock manifest check of the staged change; BASE=<rev> checks a branch (CI)
 make verify-chain   # recompute every hash and link in .log/events.jsonl
 make rebuild-decisions  # render DECISIONS.md from the event log
 make rebuild-questions  # render QUESTIONS.md from the event log
