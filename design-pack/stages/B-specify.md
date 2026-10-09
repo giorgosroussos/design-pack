@@ -113,11 +113,17 @@ Mechanical pass after every round:
    command contract; FND-03 and FND-04 only when there is an API or a UI). Domain phases in
    dependency order, each with Goal, packages with stable IDs and outcome bullets, and Exit
    criteria a command or test demonstrates.
-   Then give every package its six characteristics: the data the loop's prompt-selection table
+   Then give every package its seven characteristics: the data the loop's prompt-selection table
    runs on (`templates/AGENTS.md` §Prompt selection), and the data an orchestrator schedules by:
    - `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --task all`
-     prints, per package, the derived `Surfaces` and `Touches red line`. Copy both onto the
-     package verbatim, one line each. They are derived from the sections the package cites, so
+     prints, per package, the derived `Surfaces`, `Touches red line` and
+     `Touches sensitive code`. Copy them onto the package verbatim, one line each.
+     `Touches sensitive code` is derived from the package's `File surface:` and the plan's
+     **Sensitive paths** list, which you write first, from the architecture spec's layout:
+     one bullet per kind (`auth`, `storage`, `protocol`) naming the directories where that code
+     lives, or `- none`. That list is what selects the review pass, so a path left off it is a
+     review that never runs; when in doubt, list the directory. The value follows the file surface
+     you set below, so copy it after that. All three are derived, so
      they are never judged and never written from memory; `AGENTS.md` does not exist yet, so
      `Touches red line` reads `no` for every package and Stage C recomputes it once the red lines
      are compiled.

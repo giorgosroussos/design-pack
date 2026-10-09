@@ -6,7 +6,7 @@ remaining packages contiguous (FND-01, FND-02, FND-03).
 Domain phases: one section per phase, in dependency order, each with Goal, Work packages
 (stable IDs `AAA-NN`, three-letter prefix per phase, bullets = outcomes, not tasks) and Exit
 criteria that a test or a command can demonstrate. Every package gets a TRACEABILITY.md row.
-Every package ALSO ends with its six characteristics, one per line. The first three are what the
+Every package ALSO ends with its seven characteristics, one per line. The first four are what the
 prompt-selection table in AGENTS.md reads; the last three are what a plan needs in order to be split
 at Stage B and scheduled in lanes and in order afterwards:
   - Surfaces:            the surfaces the sections this package cites resolve to, in the order
@@ -15,6 +15,11 @@ at Stage B and scheduled in lanes and in order afterwards:
                          surface, a register bullet the surface of its heading.
   - Touches red line:    yes | no. DERIVED: yes iff a red line in AGENTS.md cites a section this
                          package cites.
+  - Touches sensitive code: yes | no. DERIVED: yes iff a path of this package's `File surface:`
+                         is, contains or sits inside a path the Sensitive paths list below names.
+                         It is what selects prompt 2: measured on a real pack, the sections a
+                         package cites say nothing about whether it changes auth, storage or the
+                         protocol, and the files it changes say exactly that.
   - Contract change:     yes | no. The plan author's JUDGEMENT at Stage B (does this package
                          define or modify an interface, API or schema contract), recorded like any
                          other implementation call. `check-docs` checks it is there and boolean;
@@ -39,18 +44,23 @@ at Stage B and scheduled in lanes and in order afterwards:
                          pair, naming both and the section. Anything more is the plan author's
                          JUDGEMENT, recorded in the same decision as the lanes; it is checked for
                          existence, phase and cycles. `--task all` prints each phase's order.
-Do not write the first two by hand: `python3 scripts/check-docs.py --task all` prints the derived
-pair for every package, and the `task-policy` rule fails the build when a stored value and the
+Do not write the three derived ones by hand: `python3 scripts/check-docs.py --task all` prints the derived
+values for every package, and the `task-policy` rule fails the build when a stored value and the
 pack disagree. The next three are written by the plan author and never recomputed, and the sixth
 is the author's apart from the contract pairs the gate derives. There is no seventh field:
 `blocked-by` is read from QUESTIONS.md at run time, so a card can be resolved without unlocking
 this file.
 Placeholders:
   {{FND01_CHARACTERISTICS}} {{FND02_CHARACTERISTICS}} {{FND03_CHARACTERISTICS}} {{FND04_CHARACTERISTICS}}
-                           the six lines for each Phase 0 package (FND-03/FND-04 only when their
+                           the seven lines for each Phase 0 package (FND-03/FND-04 only when their
                            conditional block is kept); FND-02 depends on FND-01, whose targets it
-                           runs. Domain packages carry their own six lines inside {{DOMAIN_PHASES}}.
+                           runs. Domain packages carry their own seven lines inside {{DOMAIN_PHASES}}.
 Placeholders:
+  {{SENSITIVE_PATHS}}      the Sensitive paths list: one bullet per kind that exists, `- auth: <paths>`,
+                           `- storage: <paths>`, `- protocol: <paths>`, each path as the repository
+                           layout spells it; or the single bullet `- none`. auth is identity, sessions
+                           and access checks; storage is schema, migrations and persisted files;
+                           protocol is the API and wire contract and the types it shares
   {{DEPENDENCY_GRAPH}}     mermaid flowchart of phases
   {{STACK_SCAFFOLD_BULLET}} what FND-01 scaffolds ("Create the API app, the two SPAs, ..."), from the architecture spec
   {{INFRA_SERVICES}}        local infrastructure the contract starts ("PostgreSQL and Redis"), or "none" for a static product
@@ -135,6 +145,12 @@ Suggested maximum lanes:
 {{LANES}}
 
 Each lane uses a branch or worktree and integrates through small reviewed merges.
+
+### Sensitive paths
+
+Where auth, storage and the protocol live in the repository layout. A package whose `File surface:` reaches one of these paths states `Touches sensitive code: yes`, and that is what selects the review pass for it (`AGENTS.md` Prompt selection); `check-docs` derives the value and fails a package that states another.
+
+{{SENSITIVE_PATHS}}
 
 ## {{N_BACKLOG}}. Backlog discipline
 

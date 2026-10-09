@@ -100,8 +100,8 @@ P = {
     "STACK_SCAFFOLD_BULLET": "Create the single service application and its test harness as `02` §1 lays them out.",
     # The two derived lines are what `--task all` prints for this fixture; `Contract change`
     # is the judgement Stage B records (FND-01 defines the command contract, FND-02 does not).
-    "FND01_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: yes\n- File surface: app, tests, migrations, Makefile\n- Lane: service and migrations\n- Depends on: —",
-    "FND02_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Contract change: no\n- File surface: .gitlab-ci.yml, scripts\n- Lane: tests and infrastructure\n- Depends on: FND-01",
+    "FND01_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Touches sensitive code: yes\n- Contract change: yes\n- File surface: app, tests, migrations, Makefile\n- Lane: service and migrations\n- Depends on: —",
+    "FND02_CHARACTERISTICS": "- Surfaces: —\n- Touches red line: no\n- Touches sensitive code: no\n- Contract change: no\n- File surface: .gitlab-ci.yml, scripts\n- Lane: tests and infrastructure\n- Depends on: FND-01",
     "STACK_LINE": "one Python service, PostgreSQL, no web UI in MVP.",
     "ONE_LINE": "A single-user bookkeeping notebook: entries in, monthly totals out. Not an accounting system, not multi-user.",
     # PLAN.md
@@ -183,6 +183,7 @@ P = {
         "- Notebook and entry tables with the ownership constraint of `01` §2.",
         "- Surfaces: security",
         "- Touches red line: yes",
+        "- Touches sensitive code: yes",
         "- Contract change: yes",
         "- File surface: app/notebooks, migrations, tests/notebooks",
         "- Lane: service and migrations",
@@ -193,6 +194,7 @@ P = {
         "- Totals derived at read time (`01` §3); the pending retention card Q-002 is resolved before this package starts.",
         "- Surfaces: —",
         "- Touches red line: yes",
+        "- Touches sensitive code: no",
         "- Contract change: no",
         "- File surface: app/totals, tests/totals",
         "- Lane: service and migrations",
@@ -205,6 +207,7 @@ P = {
     "N_PARALLEL": "5",
     "N_BACKLOG": "6",
     "LANES": "- service and migrations\n- tests and infrastructure",
+    "SENSITIVE_PATHS": "- auth: app/access\n- storage: migrations, app/notebooks",
     # specs/agent-playbook.md
     "EXCLUDED_CAPABILITIES": "sharing, a web UI, an API",
     "CONTRACT_ARTIFACTS": "shared type definitions",
@@ -751,10 +754,14 @@ else
     report no "13c the 1o row" "AGENTS.md has no row for prompt 1o"
 fi
 
-if grep -q 'Expect prompt 2 on most packages' AGENTS.md && grep -q 'effectively always on' AGENTS.md; then
-    report ok "13d the table says that prompt 2 is effectively always on, as Q-W11.6 decided" ""
+if grep -q '| 2 — Review | After implementation, iff `Touches sensitive code` is `yes`' AGENTS.md \
+   && grep -q '^### Sensitive paths$' specs/07-implementation-plan.md \
+   && [ "$(grep -c '^- Touches sensitive code: ' specs/07-implementation-plan.md)" = "4" ] \
+   && python3 scripts/check-docs.py --task LDG-02 | grep -q 'Touches sensitive code: no' \
+   && python3 scripts/check-docs.py --task LDG-01 | grep -q 'Touches sensitive code: yes'; then
+    report ok "13d prompt 2 is selected by the code a package touches: the plan lists the sensitive paths and every package carries the derived value (W12)" ""
 else
-    report no "13d Q-W11.6" "AGENTS.md does not say it"
+    report no "13d W12" "the table, the list or a package's value is missing"
 fi
 
 # --- 14. the server half where the host takes no pre-receive hook (W11.7) -----------

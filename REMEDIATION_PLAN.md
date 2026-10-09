@@ -54,7 +54,7 @@ bash design-pack/scripts/test-land.sh
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
 | W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | done |
 | W11 | Parallel execution under an orchestrator | B — orchestration; 6 owner decisions | ~4 days | done |
-| W12 | Prompt 2's selection does not discriminate | C — measured, owner | ? | not started |
+| W12 | Prompt 2's selection does not discriminate | C — measured, owner | ½ day | done |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -1410,7 +1410,11 @@ repository runs it.
 
 ## W12 — Prompt 2's selection does not discriminate (**owner**)
 
-Status: not started
+Status: done
+Decision: **the file-surface derivation (owner, 2026-10-09)**, the candidate the ground truth
+points to. Prompt 2 is selected by `Touches sensitive code`, `Touches red line` and `Contract
+change`. `Surfaces` stays on the package and in the brief as information for a reviewer, and the
+table no longer reads it.
 
 Source: the W11.6 measurement on dnd-vtt (recorded under W11.6). Prompt 2 is selected for 45 of
 46 packages, and narrowing `Surfaces` to statement level selects the same 45. Three things drive
@@ -1434,6 +1438,89 @@ prove the rule on dnd-vtt with the same script. Candidates to measure, not yet d
 Each candidate is a change to what the owner's plan says, or to the policy table, so the choice
 is the owner's.
 
+### Ground truth (2026-10-09)
+
+The W11.6 measurement counted how often review was selected, but nothing said how often it
+*should* be. So this measurement establishes that from dnd-vtt's own history. It takes every
+commit whose subject starts with a package ID, collects the files each package's commits
+touched, and drops tests. A package **must be reviewed** when it touched any of the following:
+
+| Kind | Paths |
+| --- | --- |
+| auth | `server/src/auth/`, `server/src/http/auth`, `shared/src/auth` |
+| storage | `server/migrations/`, `server/src/db/`, `server/src/archive/`, `server/src/images/`, `shared/src/archive` |
+| protocol | `server/src/ws/`, `server/src/http/`, `shared/src/` |
+
+The other packages are **skip-eligible**.
+
+Result: of the 46 packages in the plan, **36 must be reviewed** and only **10 are skip-eligible**:
+DMT-03, FND-04, PKG-03, PRP-01, UXR-01, UXR-03, UXR-04, UXR-05, UXR-06 and UXR-07. Each candidate
+rule below was scored against that with the pack's own derived characteristics:
+
+| Rule | Selects | Misses a package that must be reviewed | Reviews a skip-eligible package |
+| --- | --- | --- | --- |
+| today: (security or data) or red line or contract | 45 | 1 (FND-01) | 10 |
+| (security or data) and red line, or contract | 36 | 4 (FND-01, FND-02, LIV-03, REL-03) | 4 |
+| red line or contract | 37 | 3 (FND-01, LIV-03, REL-03) | 4 |
+| red line only | 32 | 8 | 4 |
+| contract only | 27 | 9 | **0** |
+| (security or data) only | 44 | 2 | **10** |
+
+What it says:
+1. **"Almost always on" is mostly right.** Today's rule is correct for 36 of 46 packages, and
+   its cost is 10 unnecessary reviews, not 45.
+2. **`Surfaces` carries no signal for this decision.** On its own it selects every
+   skip-eligible package, because a section that mentions data is not a package that changes
+   storage. `Contract change`, the one judgement among the three, makes no false selection.
+3. **No rule over the current characteristics is a good trade.** The best one avoids 6 reviews
+   and misses LIV-03 and REL-03, which changed connection auth and the protocol. Missing those
+   reviews costs more than the 6 reviews saved.
+4. **The discriminator is which files a package touches.** The pack has carried that since
+   W10.5, as `File surface:`. The candidate this points to is one more characteristic,
+   `Touches sensitive code`. It would be derived as yes when `File surface:` names a path that
+   the architecture spec lists as auth, storage or protocol. Its accuracy depends on how well a
+   Stage B file surface predicts the real one, and dnd-vtt cannot measure that: it has no file
+   surfaces, and any written now would be written with hindsight. The first pack planned under
+   W10.5 can.
+
+### Fix
+
+Files: `templates/scripts/check-docs.py`, `templates/specs/implementation-plan.md`,
+`templates/AGENTS.md` (Prompt selection), `templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`,
+`stages/B-specify.md`, `reference/events-and-rules.md`, `DOCUMENTATION.md`,
+`scripts/test-task-policy.sh`, `scripts/test-render.sh`.
+
+1. **The list.** The plan's Safe parallelization section gains a `### Sensitive paths`
+   subsection: one bullet per kind (`- auth: …`, `- storage: …`, `- protocol: …`) naming
+   repository-layout paths, or the single bullet `- none`. It lives in the plan rather than the
+   architecture spec because `File surface:` already uses this vocabulary, and the plan is the
+   template the gate reads. It is the owner's, and the freeze hard-locks it.
+2. **The characteristic.** `Touches sensitive code: yes | no` is the seventh characteristic, and
+   it is DERIVED. It is yes iff a `File surface:` path is a listed path, sits inside one, or
+   contains one: `app` contains `app/access`. `task-policy` recomputes it, and a mismatch is
+   reported with the path and its kind. A plan with no list fails, because the review selection
+   would otherwise rest on nothing.
+3. **The policy.** Prompt 2 runs iff `Touches sensitive code` is yes, or `Touches red line` is
+   yes, or `Contract change` is yes.
+4. **Stage B** writes the list before the file surfaces, from the architecture layout, and
+   copies the derived value with the other two. When in doubt it lists the directory, because a
+   path left off the list is a review that never runs.
+5. `plan_lanes` stops at any heading, so the list's bullets are not read as lanes.
+
+Expected effect, on the ground truth above, if a package's file surface matches what it
+actually touched: no package that must be reviewed is missed, and 4 are reviewed needlessly
+(FND-04, PKG-03, PRP-01, UXR-07), down from 10. All four come from `Touches red line`, which
+still cites sections. Those numbers rest on the file surfaces being accurate. dnd-vtt has none
+written before the fact, so the real test is the first pack planned under W10.5. That
+measurement is a run, not a change, and it reopens this item only if the result disagrees.
+
+Acceptance:
+- [x] A file surface inside a sensitive path, or containing one, derives yes, and a stated `no`
+      fails, naming the path and its kind. A plan without the list fails. A `- none` list
+      passes. `--task` prints the value. *(test-task-policy 16–16e)*
+- [x] The rendered plan carries the list and the value on every package, and the table selects
+      prompt 2 from it. *(test-render 13d)*
+- [x] Every suite is green.
 ---
 
 ## Not in scope
@@ -1979,3 +2066,28 @@ Append-only. One entry per session per item touched. Form:
   - The template's `AGENTS.md` grew by about 2 KB: the 1o row, the wave sentence and the Q-W11.6
     paragraph. The fixture renders at 17.1 KB against the 20 KB ceiling, so a pack with many red
     lines has less headroom than it had.
+
+### 2026-10-09 — W12 — done (owner chose the file-surface derivation)
+- Changed:
+  - `check-docs.py`: `plan_sensitive_paths`, `path_overlaps` and `sensitive_hits`;
+    `Touches sensitive code` in `TASK_FIELDS`, `DERIVED_FIELDS` and `BOOLEAN_FIELDS`; the
+    mismatch detail names the path and its kind; a missing list fails; `--task` prints the
+    value; `plan_lanes` stops at any heading.
+  - The plan template gains the Sensitive paths subsection and the field note, with seven
+    characteristics.
+  - `AGENTS.md` changes the Prompt selection paragraph and row 2, and the paragraph after the
+    table now states the ground truth instead of "effectively always on".
+  - The prompt sample's preamble, Stage B B5.1, the reference row and `DOCUMENTATION.md`.
+- Proved by:
+  - Ground truth from dnd-vtt's commit history, recorded above: 36 of 46 packages must be
+    reviewed, and six rules were scored against it.
+  - Nine suites green: 31 + 17 + 34 + 39 + 42 + 2 + 11 + 43 + 19 = 238 cases.
+    `test-task-policy.sh` gains five cases; case 12f now states yes for a package moved into
+    app/access. `test-render.sh` case 13d now asserts W12 instead of the Q-W11.6 sentence.
+- Left open:
+  - The accuracy of the derivation rests on Stage B file surfaces. Measure it on the first pack
+    planned under W10.5, with the same history script.
+  - The 4 needless reviews that remain come from red lines that cite whole sections. Narrowing
+    those is a separate question, not asked here.
+  - Packs generated before this change have no list and no field, so `task-policy` fails until
+    both are added. That is the intended migration.

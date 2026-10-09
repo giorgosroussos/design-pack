@@ -155,24 +155,24 @@ None yet: no package has been delivered. The first one to reach `done` adds its 
 
 ## Prompt selection
 
-`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds four session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Surfaces`, `Touches red line` and `Contract change`; the first two are derived from the sections the package cites and `make check-docs` verifies them, the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four.
+`SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` holds four session prompts, and this table decides which of them a task needs. The mechanical gates are the floor for every task, not a prompt: the package's executable acceptance criteria and `make check-docs` run whatever the table says, and the review prompt exists only for what those gates cannot check. Each work package in `specs/{{NN_PLAN}}-implementation-plan.md` states `Touches sensitive code`, `Touches red line` and `Contract change`; the first is derived from its `File surface:` and the plan's Sensitive paths list, the second from the sections it cites, and `make check-docs` verifies both; the third is the plan author's judgement. `blocked-by` is not stored anywhere: it is the set of open cards in `QUESTIONS.md` whose `Blocks:` names the package, read when the task starts, so resolving a card needs no change to the plan. `python3 scripts/check-docs.py --task <PACKAGE>` prints all four, and `Surfaces` beside them: it tells a reviewer which surfaces the cited sections touch, and selects nothing, because a section that mentions data is not a package that changes storage.
 
 | Prompt | Run when |
 | --- | --- |
 | 1 — Implement | Always, unless an orchestrator runs the package. |
 | 1o — Implement (orchestrated) | Under an orchestrator, in place of prompt 1; prompts 2 and 3 are unchanged. |
 | 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
-| 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness, and there is no security, isolation or contract dimension for a review to add. |
+| 2 — Review | After implementation, iff `Touches sensitive code` is `yes`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness, and there is no security, isolation or contract dimension for a review to add. |
 
 The table says *whether* prompt 2 runs; `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` says *where*: a
 review runs in a session that did not write the code, because the session that did holds the
 assumptions the review exists to catch.
 
-Expect prompt 2 on most packages. The characteristics are derived from whole cited sections, and
-in a real pack nearly every section carries a security or data statement and a red line: on the
-first pack built this way, 45 of 46 packages selected it. That is the table working as written,
-so the review is effectively always on. A package that should skip it says so through narrower
-citations in the plan, never through an edit to this table.
+Expect prompt 2 on most packages that touch the server. On the first pack built this way, 36 of
+46 packages changed auth, storage or the protocol, and the files they changed are what selects
+the review, not the sections they cite: a package whose file surface is UI-only skips it. A
+package that skips a review it needed is a file surface that was drawn too small, and the fix is
+the plan's, through `make unlock`, never this table's.
 
 ## Living documents
 

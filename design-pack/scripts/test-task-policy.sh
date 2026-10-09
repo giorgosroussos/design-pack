@@ -98,6 +98,7 @@ EOF
 - Enforce the ownership rule of `01` §2 in one place.
 - Surfaces: security
 - Touches red line: yes
+- Touches sensitive code: yes
 - Contract change: no
 - File surface: app/access, tests/access
 - Lane: service
@@ -108,6 +109,7 @@ EOF
 - Derive the monthly total as `01` §1 describes.
 - Surfaces: —
 - Touches red line: no
+- Touches sensitive code: no
 - Contract change: yes
 - File surface: app/totals, tests/totals
 - Lane: service
@@ -117,6 +119,7 @@ EOF
 
 - Surfaces: security
 - Touches red line: yes
+- Touches sensitive code: no
 - Contract change: no
 - File surface: docs
 - Lane: tests and infrastructure
@@ -128,6 +131,11 @@ Suggested maximum lanes:
 
 - service
 - tests and infrastructure
+
+### Sensitive paths
+
+- auth: app/access
+- storage: migrations
 EOF
 
     cat > AGENTS.md <<'EOF'
@@ -146,7 +154,7 @@ The mechanical gates are the floor for every task.
 | 1 — Implement | Always, unless an orchestrator runs the package. |
 | 1o — Implement (orchestrated) | Under an orchestrator, in place of prompt 1; prompts 2 and 3 are unchanged. |
 | 3 — Resolve questions | Before the package, iff an open card in QUESTIONS.md has `Blocks:` = this package. |
-| 2 — Review | After implementation, iff `Surfaces` includes `security` or `data`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness. |
+| 2 — Review | After implementation, iff `Touches sensitive code` is `yes`, or `Touches red line` is `yes`, or `Contract change` is `yes`. Otherwise skip: the executable acceptance criteria and `make check-docs` already cover correctness. |
 
 ## Living documents
 
@@ -422,6 +430,13 @@ fi
 # Two packages in one lane touching one path are not two lanes: reported, not failed.
 fixture
 sed -i 's|^- File surface: app/totals, tests/totals$|- File surface: app/access, tests/totals|' specs/03-implementation-plan.md
+python3 - <<'PYEOF'
+import io
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+i = t.index("`PKG-02`")      # now inside app/access, so it touches sensitive code
+t = t[:i] + t[i:].replace("- Touches sensitive code: no", "- Touches sensitive code: yes", 1)
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
 out="$(python3 scripts/check-docs.py --task all 2>&1)"
 if printf '%s' "$out" | grep -q "PKG-01 and PKG-02 share lane 'service' and the path(s) app/access"; then
     report ok "12e --task all reports two packages sharing a lane and a path" ""
@@ -535,6 +550,62 @@ elif grep -q 'PKG-04 (Phase 1) depends on PKG-02 (Phase 0); phase order already 
     report ok "15b a dependency on another phase's package fails with \"phase order already implies this\"; a value that is no ID fails" ""
 else
     report no "15b cross-phase" "$(cat "$work/15b.out")"
+fi
+
+# --- 16: Touches sensitive code, derived from the file surface and the plan's list --
+# PKG-01's file surface is app/access, which the list calls auth: it states yes, and
+# the baseline (case 1+2) already proves that passes.
+
+fixture
+sed -i 's|^- File surface: app/totals, tests/totals$|- File surface: app/access/totals, tests/totals|' specs/03-implementation-plan.md
+if rule > "$work/16.out" 2>&1; then
+    report no "16 a file surface inside a sensitive path, stated no" "no failure reported"
+elif grep -q 'PKG-02 states `Touches sensitive code: no`, but the pack derives `yes`: its file surface reaches `app/access/totals` (app/access, listed as `auth`)' "$work/16.out"; then
+    report ok "16 a file surface reaching a sensitive path derives yes, and a stated no fails, naming the path and its kind" ""
+else
+    report no "16 sensitive derivation" "$(cat "$work/16.out")"
+fi
+
+fixture
+sed -i 's|^- File surface: docs$|- File surface: app|' specs/03-implementation-plan.md
+if rule > "$work/16b.out" 2>&1; then
+    report no "16b a file surface containing a sensitive path" "no failure reported"
+elif grep -q 'PKG-03 states `Touches sensitive code: no`, but the pack derives `yes`' "$work/16b.out"; then
+    report ok "16b a file surface that contains a sensitive path (app holds app/access) derives yes" ""
+else
+    report no "16b containing path" "$(cat "$work/16b.out")"
+fi
+
+fixture
+python3 - <<'PYEOF'
+import io
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+t = t.replace("\n### Sensitive paths\n\n- auth: app/access\n- storage: migrations\n", "\n")
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/16c.out" 2>&1; then
+    report no "16c a plan without the list" "no failure reported"
+elif grep -q 'the plan has no `Sensitive paths` list' "$work/16c.out"; then
+    report ok "16c a plan with no Sensitive paths list fails: the review selection would rest on nothing" ""
+else
+    report no "16c missing list" "$(cat "$work/16c.out")"
+fi
+
+fixture
+sed -i 's|^- auth: app/access$|- none|; /^- storage: migrations$/d' specs/03-implementation-plan.md
+sed -i 's/^- Touches sensitive code: yes$/- Touches sensitive code: no/' specs/03-implementation-plan.md
+if rule > "$work/16d.out" 2>&1; then
+    report ok "16d a product that declares \`- none\` derives no for every package, and passes" ""
+else
+    report no "16d none" "$(cat "$work/16d.out")"
+fi
+
+fixture
+if python3 scripts/check-docs.py --task PKG-01 | grep -q 'Touches sensitive code: yes' \
+   && python3 scripts/check-docs.py --task all | grep -q '^PKG-02 .*Touches sensitive code: no'; then
+    report ok "16e --task prints Touches sensitive code beside the other characteristics" ""
+else
+    report no "16e --task" "$(python3 scripts/check-docs.py --task all | head -3)"
 fi
 
 # --- 11: --brief selects the pack, in order, and never writes -------------------

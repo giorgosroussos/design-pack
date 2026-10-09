@@ -104,15 +104,18 @@ Rules
   markers       no unrendered `{{...}}` placeholder or `TBD` remains in the
                 documents or in the root Makefile
   task-policy   every work package states `Surfaces:`, `Touches red line:`,
-                `Contract change:`, `File surface:`, `Lane:` and `Depends on:`,
-                the third to fifth judgements, checked for presence and for a
+                `Touches sensitive code:`, `Contract change:`, `File surface:`,
+                `Lane:` and `Depends on:`, the fourth to sixth judgements, checked for presence and for a
                 lane the plan's own list defines; `Depends on:` names packages
                 of the same phase only, with no cycle, and it is partly derived:
                 a package citing a section that a `Contract change: yes` package
-                of its phase also cites lists that package; the two derived ones equal what the pack
-                itself says (the surfaces of the cards and register bullets the
-                package's cited sections resolve to, and whether a red line
-                cites a section the package cites); and the prompt-selection
+                of its phase also cites lists that package; the three derived
+                ones equal what the pack itself says (the surfaces of the cards
+                and register bullets the package's cited sections resolve to,
+                whether a red line cites a section the package cites, and
+                whether its file surface names a path the plan's "Sensitive
+                paths" list calls auth, storage or protocol, a list the plan
+                must have); and the prompt-selection
                 table in AGENTS.md names only the four real prompts and only
                 characteristics this rule defines, so a renamed characteristic
                 or a typo in the table fails the build rather than silently
@@ -151,10 +154,12 @@ STATUSES = {"not started", "in progress", "done"}
 DECISION_TYPES = {"implementation", "spec-amendment", "adr"}
 CARD_FIELDS = ["Surface", "Source", "Question", "Options", "Recommendation", "Blocks"]
 SURFACE_ORDER = ["data", "security", "scope", "external", "ux"]
-TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change", "File surface", "Lane",
-               "Depends on"]
-DERIVED_FIELDS = ["Surfaces", "Touches red line"]
-BOOLEAN_FIELDS = ["Touches red line", "Contract change"]
+TASK_FIELDS = ["Surfaces", "Touches red line", "Touches sensitive code", "Contract change",
+               "File surface", "Lane", "Depends on"]
+DERIVED_FIELDS = ["Surfaces", "Touches red line", "Touches sensitive code"]
+BOOLEAN_FIELDS = ["Touches red line", "Touches sensitive code", "Contract change"]
+SENSITIVE_HEADING = "Sensitive paths"
+SENSITIVE_KINDS = ["auth", "storage", "protocol"]
 LANE_HEADING = "Safe parallelization"
 LIVE_CHARACTERISTIC = "blocked-by"
 POLICY_HEADING = "Prompt selection"
@@ -1198,10 +1203,51 @@ def red_line_sections(root):
     return out
 
 
+def plan_sensitive_paths(root):
+    """{path: kind} from the plan's "Sensitive paths" list, or None when it has none.
+
+    One bullet per kind, `- auth: server/src/auth, shared/src/auth`, or the single
+    bullet `- none` for a product with no such code. The list is the owner's
+    statement of where auth, storage and the protocol live, written in the
+    vocabulary `File surface:` already uses (the repository layout), so that
+    which packages change them is a derivation rather than a reading of prose.
+    """
+    plan = spec_by_role(root, "implementation-plan")
+    if not plan:
+        return None
+    text = strip_fences(read(plan))
+    m = re.search(r"^#{2,4}\s+(?:\d+(?:\.\d+)*\.?\s+)?%s\s*$" % re.escape(SENSITIVE_HEADING), text, re.M)
+    if not m:
+        return None
+    body = re.split(r"^#{2,4}\s", text[m.end():], maxsplit=1, flags=re.M)[0]
+    out = {}
+    for line in body.splitlines():
+        bm = re.match(r"^\s*[-*]\s+([a-z]+)\s*:\s*(.+?)\s*(?:\[[^\]]*\])?\s*$", line)
+        if bm and bm.group(1) in SENSITIVE_KINDS:
+            for path in bm.group(2).split(","):
+                path = path.strip().strip("`").rstrip("/")
+                if path:
+                    out[path] = bm.group(1)
+    return out
+
+
+def path_overlaps(a, b):
+    """`server` and `server/src/auth` overlap; `server/src/auth` and `server/src/ws` do not."""
+    a, b = a.rstrip("/"), b.rstrip("/")
+    return a == b or a.startswith(b + "/") or b.startswith(a + "/")
+
+
+def sensitive_hits(stored, sensitive):
+    """[(file-surface path, sensitive path, kind)] a package's file surface reaches."""
+    return [(f, s, kind) for f in sorted(file_surfaces(stored))
+            for s, kind in sorted((sensitive or {}).items()) if path_overlaps(f, s)]
+
+
 def derive_characteristics(root, cards):
     """{package: derived characteristics}, from the pack's own data only."""
     index = section_surfaces(root, cards)
     red = red_line_sections(root)
+    sensitive = plan_sensitive_paths(root)
     out = {}
     for pkg, ln, block in plan_package_blocks(root):
         cites = with_parents(text_citations(block))
@@ -1216,6 +1262,9 @@ def derive_characteristics(root, cards):
             "cites": sorted(cites),
             "red hits": hits,
         }
+        reached = sensitive_hits(stored_characteristics(block), sensitive)
+        out[pkg]["Touches sensitive code"] = "yes" if reached else "no"
+        out[pkg]["sensitive hits"] = reached
     return out
 
 
@@ -1315,7 +1364,9 @@ def plan_lanes(root):
     body = None
     for m in re.finditer(r"^##\s+\d*\.?\s*(.*)$", text, re.M):
         if LANE_HEADING.lower() in m.group(1).lower():
-            body = re.split(r"^##\s", text[m.end():], maxsplit=1, flags=re.M)[0]
+            # up to the next heading of any level: a subsection (Sensitive paths)
+            # holds bullets that are not lanes
+            body = re.split(r"^#{2,4}\s", text[m.end():], maxsplit=1, flags=re.M)[0]
             break
     if body is None:
         return set()
@@ -1543,6 +1594,10 @@ def check_task_policy(root, cards):
     rel = os.path.relpath(plan, root) if plan else SPECS_DIR
     packages = plan_package_blocks(root)
     lanes = plan_lanes(root)
+    if packages and plan_sensitive_paths(root) is None:
+        fail("task-policy", rel, "the plan has no `%s` list. `Touches sensitive code` is derived "
+             "from it: one bullet per kind (%s) naming the paths of the repository layout where "
+             "that code lives, or `- none`" % (SENSITIVE_HEADING, ", ".join(SENSITIVE_KINDS)))
     if not lanes and packages:
         note("task-policy", "%s lists no lanes under %s, so `Lane:` is checked for presence only"
              % (rel, LANE_HEADING))
@@ -1552,7 +1607,8 @@ def check_task_policy(root, cards):
         for field in TASK_FIELDS:
             values = stored.get(field, [])
             if not values:
-                if field in ("Surfaces", "Touches red line", "Contract change"):
+                if field in ("Surfaces", "Touches red line", "Touches sensitive code",
+                             "Contract change"):
                     why = "cannot be matched against the prompt-selection table in AGENTS.md"
                 elif field == "Depends on":
                     why = ("cannot be ordered inside its phase: `Depends on:` names the packages "
@@ -1591,15 +1647,22 @@ def check_task_policy(root, cards):
             if value is None or field not in expected:
                 continue
             if value != expected[field]:
-                detail = ("the sections it cites are %s"
-                          % (", ".join("`%s` \u00a7%s" % c for c in expected["cites"]) or "none")
-                          if field == "Surfaces" else
-                          "a red line cites %s"
-                          % (", ".join("`%s` \u00a7%s" % c for c in expected["red hits"])
-                             or "none of its sections"))
+                if field == "Surfaces":
+                    detail = ("the sections it cites are %s"
+                              % (", ".join("`%s` \u00a7%s" % c for c in expected["cites"]) or "none"))
+                elif field == "Touches red line":
+                    detail = ("a red line cites %s"
+                              % (", ".join("`%s` \u00a7%s" % c for c in expected["red hits"])
+                                 or "none of its sections"))
+                else:
+                    detail = ("its file surface reaches %s"
+                              % (", ".join("`%s` (%s, listed as `%s`)" % h for h in expected["sensitive hits"])
+                                 or "no path the plan's %s list names" % SENSITIVE_HEADING))
+                cause = ("the file surface or the %s list" % SENSITIVE_HEADING
+                         if field == "Touches sensitive code" else "the citation that no longer holds")
                 fail("task-policy", where, "%s states `%s: %s`, but the pack derives `%s`: %s. "
-                     "This characteristic is derived, not judged: correct the field, or the "
-                     "citation that no longer holds" % (pkg, field, value, expected[field], detail))
+                     "This characteristic is derived, not judged: correct the field, or %s"
+                     % (pkg, field, value, expected[field], detail, cause))
     check_dependencies(root, packages, rel)
     ok("task-policy", "%d work package(s) carry their characteristics, %d lane(s)"
        % (len(packages), len(lanes)))
@@ -1630,9 +1693,10 @@ def report_tasks(root, cards, selector, sink=None):
         surface = (stored.get("File surface") or [EMPTY])[0] or EMPTY
         depends = (stored.get("Depends on") or [EMPTY])[0] or EMPTY
         cards_blocking = blocked_by(cards, pkg)
-        line = ("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %-10s "
-                "Depends on: %-16s Lane: %-24s File surface: %s"
-                % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
+        line = ("%-10s Surfaces: %-34s Touches red line: %-4s Touches sensitive code: %-4s "
+                "Contract change: %-4s %s: %-10s Depends on: %-16s Lane: %-24s File surface: %s"
+                % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"],
+                   derived[pkg]["Touches sensitive code"], contract,
                    LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY, depends, lane, surface))
         if sink is None:
             print(line)
