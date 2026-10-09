@@ -1238,9 +1238,9 @@ others. Decision: **only items with a `Branch:` (owner, 2026-10-09)**. A `Lane:`
 is checked against the plan on every item, because a wrong copy is wrong in either mode.
 
 Acceptance:
-- [ ] Two dispatched `Now` items in one lane fail. A blocked package in `Now` fails. A `Now` item
+- [x] Two dispatched `Now` items in one lane fail. A blocked package in `Now` fails. A `Now` item
       with an unmet dependency fails.
-- [ ] A single `Now` item without `Branch:` (single-session use) passes.
+- [x] A single `Now` item without `Branch:` (single-session use) passes.
 
 ### W11.5 — Spec amendments under parallel work (B, **owner**)
 

@@ -95,6 +95,7 @@ P = {
     "ISOLATION_TERM": "notebook isolation",
     "ISOLATION_AXIS": "notebook",
     "INFRA_SERVICES": "PostgreSQL",
+    "FND01_LANE": "service and migrations",
     "PRIMARY_DB": "PostgreSQL 16",
     "STACK_SCAFFOLD_BULLET": "Create the single service application and its test harness as `02` §1 lays them out.",
     # The two derived lines are what `--task all` prints for this fixture; `Contract change`

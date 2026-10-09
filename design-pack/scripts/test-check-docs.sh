@@ -462,5 +462,147 @@ else
     report no "lookup drift" "$(cat "$work/drift.out")"
 fi
 
+# --- now-items: a dispatched wave (W11.4) -------------------------------------------
+
+rm -rf specs; mkdir -p specs
+cat > specs/03-implementation-plan.md <<'EOF'
+# Implementation Plan
+
+## 3. Phase 0 — Foundations
+
+### Work packages
+
+`PKG-01` Access
+
+- Surfaces: —
+- Touches red line: no
+- Contract change: yes
+- File surface: app/access
+- Lane: service
+- Depends on: —
+
+`PKG-02` Totals
+
+- Surfaces: —
+- Touches red line: no
+- Contract change: no
+- File surface: app/totals
+- Lane: service
+- Depends on: —
+
+`PKG-03` Reports
+
+- Surfaces: —
+- Touches red line: no
+- Contract change: no
+- File surface: app/reports
+- Lane: reports
+- Depends on: PKG-01
+
+## 5. Safe parallelization
+
+- service
+- reports
+EOF
+cat > TRACEABILITY.md <<'EOF'
+| Package | Phase | Outcome | Key specs | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| PKG-01 | 0 | Access | — | in progress | 2026-10-09: begun |
+| PKG-02 | 0 | Totals | — | not started | — |
+| PKG-03 | 0 | Reports | — | not started | — |
+EOF
+cat > QUESTIONS.md <<'EOF'
+# QUESTIONS
+
+## Blocking
+
+None.
+
+## Open
+
+### Q-001 — Report format
+- Surface: ux
+- Source: the fixture
+- Question: Which format?
+- Options:
+  - A) PDF → effect on ux: printable.
+  - B) CSV → effect on ux: editable.
+- Recommendation: A.
+- Blocks: PKG-02
+
+## Resolved
+
+None.
+EOF
+wave() {   # wave <PKG:Lane:Branch>...: write PLAN.md with those Now items
+    { printf '# PLAN\n\n## Now\n'
+      for item in "$@"; do
+          pkg="${item%%:*}"; rest="${item#*:}"; lane="${rest%%:*}"; branch="${rest#*:}"
+          printf '\n### %s — item\n\n- **Outcome:** something.\n' "$pkg"
+          [ -n "$lane" ] && printf -- '- **Lane:** %s\n' "$lane"
+          [ -n "$branch" ] && printf -- '- **Branch:** %s\n' "$branch"
+      done
+      printf '\n## Next\n\n1. Later.\n'; } > PLAN.md
+}
+wave_rule='cards, _, _ = cd.parse_cards(root); rows = cd.traceability_rows(root); cd.check_wave(root, rows, cards)'
+
+wave "PKG-01:service:w/pkg-01" "PKG-02:service:w/pkg-02"
+sed -i '/^- Blocks: PKG-02$/s/PKG-02/PKG-09/' QUESTIONS.md
+if probe "$wave_rule" > "$work/w1.out" 2>&1; then
+    report no "now-items: two dispatched items in one lane" "no failure reported"
+elif grep -q "PKG-01 and PKG-02 are dispatched in one lane, 'service'" "$work/w1.out"; then
+    report ok "now-items: two dispatched Now items in one lane fail" ""
+else
+    report no "now-items: one lane" "$(cat "$work/w1.out")"
+fi
+sed -i '/^- Blocks: PKG-09$/s/PKG-09/PKG-02/' QUESTIONS.md
+
+wave "PKG-02:service:w/pkg-02"
+if probe "$wave_rule" > "$work/w2.out" 2>&1; then
+    report no "now-items: a blocked package dispatched" "no failure reported"
+elif grep -q 'PKG-02 is dispatched (`Branch: w/pkg-02`) while Q-001 blocks it' "$work/w2.out"; then
+    report ok "now-items: a dispatched package with an open card blocking it fails" ""
+else
+    report no "now-items: blocked" "$(cat "$work/w2.out")"
+fi
+
+wave "PKG-03:reports:w/pkg-03"
+if probe "$wave_rule" > "$work/w3.out" 2>&1; then
+    report no "now-items: an unmet dependency" "no failure reported"
+elif grep -q 'PKG-03 is dispatched (`Branch: w/pkg-03`) and depends on PKG-01, which is in progress' "$work/w3.out"; then
+    report ok "now-items: a dispatched package whose dependency is not done fails" ""
+else
+    report no "now-items: dependency" "$(cat "$work/w3.out")"
+fi
+
+wave "PKG-02::"
+if probe "$wave_rule" > "$work/w4.out" 2>&1; then
+    report ok "now-items: a single Now item without Branch (single-session use) passes, open card and all" ""
+else
+    report no "now-items: single session" "$(cat "$work/w4.out")"
+fi
+
+wave "PKG-01:service:—" "PKG-03:reports:—"
+if probe "$wave_rule" > "$work/w5.out" 2>&1; then
+    report ok "now-items: items whose Branch is a dash are not a wave, and none of the three applies" ""
+else
+    report no "now-items: dashed branches" "$(cat "$work/w5.out")"
+fi
+
+wave "PKG-01:reports:w/pkg-01"
+if probe "$wave_rule" > "$work/w6.out" 2>&1; then
+    report no "now-items: a lane copied wrong" "no failure reported"
+elif grep -q 'PKG-01 has `Lane: reports`, and the plan gives it `service`' "$work/w6.out"; then
+    report ok "now-items: a Lane line that differs from the plan's fails, whatever the mode" ""
+else
+    report no "now-items: wrong lane" "$(cat "$work/w6.out")"
+fi
+
+if grep -q '    check_wave(root, rows, cards)' scripts/check-docs.py; then
+    report ok "now-items: main() runs the wave checks" ""
+else
+    report no "now-items: main() wiring" "check_wave is not called"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

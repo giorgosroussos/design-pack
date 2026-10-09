@@ -51,7 +51,7 @@ failures of other rules it dropped, so it never looks like a clean one.
 | Rule | Fails when |
 | --- | --- |
 | `citations` | a `NN` §M or `README.md` §Name citation resolves to no heading |
-| `now-items` | `PLAN.md` has no `Now` item, more than three, one already `done`, or one with no traceability row |
+| `now-items` | `PLAN.md` has no `Now` item, more than three, one already `done`, or one with no traceability row; a `Lane:` differs from the plan's; or, among the items with a `Branch:` (a dispatched wave), two share a lane, one is blocked by an open card, or one depends on a package not `done` |
 | `plan-size` | `PLAN.md` is over its line ceiling |
 | `packages` | a work package has no traceability row, or a row names no package |
 | `traceability` | a status is outside the three values, or a `done`/`in progress` row carries no evidence |

@@ -38,7 +38,12 @@ Rules
                 is history and is not checked: the log is append-only, so a dead
                 citation there could otherwise never be cleared
   now-items     no `Now` item in PLAN.md is `done` in TRACEABILITY.md, and every
-                `Now` item has a TRACEABILITY.md row
+                `Now` item has a TRACEABILITY.md row. A `Lane:` on an item is the
+                plan's lane for that package. The items with a `Branch:` other
+                than a dash are a wave an orchestrator has dispatched, and a wave
+                is held to three more: no two of its items share a lane, none is
+                blocked by an open card, and none depends on a package that is
+                not `done`
   plan-size     PLAN.md stays under its line ceiling
   gaps          every package or phase a GAPS.md row cites exists in the plan;
                 gap IDs are unique and increasing
@@ -980,6 +985,69 @@ def check_pending(root, pkgs, rows):
     ok("pending", "%d staging file(s)" % files)
 
 
+# --- the wave -----------------------------------------------------------------
+#
+# Under an orchestrator `PLAN.md` holds a wave: each `Now` item carries the lane
+# it runs in, copied from the plan, and the branch the orchestrator dispatched it
+# to. An item with a branch is running beside the others, so the three things
+# that make running it now unsafe are failures for it. An item without one (`-`,
+# or no line at all) is single-session work, where a `Now` item with an open card
+# is the normal state before prompt 3 runs, and none of the three applies.
+
+
+def now_items(root):
+    """[(package, {field: value})] for the `### <PACKAGE>` items under `## Now`."""
+    path = os.path.join(root, "PLAN.md")
+    if not exists(path):
+        return []
+    text = read(path)
+    if "## Now" not in text:
+        return []
+    now = text.split("## Now", 1)[1].split("## Next", 1)[0]
+    out = []
+    for m in re.finditer(r"^###\s+([A-Z]{2,5}-\d{2,3})\b.*?$(.*?)(?=^###\s|\Z)", now, re.M | re.S):
+        fields = {}
+        for fm in re.finditer(r"^\s*[-*]\s*\*?\*?(Lane|Branch):?\*?\*?:?\s*(.*?)\s*$", m.group(2), re.M):
+            fields[fm.group(1)] = fm.group(2).strip().strip("`")
+        out.append((m.group(1), fields))
+    return out
+
+
+def check_wave(root, rows, cards):
+    stored = dict((pkg, stored_characteristics(block)) for pkg, _, block in plan_package_blocks(root))
+    items = now_items(root)
+    lane_of = {}
+    for pkg, fields in items:
+        planned = (stored.get(pkg, {}).get("Lane") or [None])[0]
+        lane_of[pkg] = (planned or fields.get("Lane") or "").strip().lower()
+        if "Lane" in fields and planned is not None and fields["Lane"].lower() != planned.strip().lower():
+            fail("now-items", "PLAN.md", "%s has `Lane: %s`, and the plan gives it `%s`; the line "
+                 "is a copy of the plan's, never a choice" % (pkg, fields["Lane"], planned))
+    wave = [(pkg, fields) for pkg, fields in items
+            if fields.get("Branch", "") not in ("", EMPTY, "-", "\u2013")]
+    seen = {}
+    for pkg, fields in wave:
+        lane = lane_of.get(pkg)
+        if lane and lane in seen:
+            fail("now-items", "PLAN.md", "%s and %s are dispatched in one lane, %r; a lane runs one "
+                 "package at a time" % (seen[lane], pkg, lane))
+        elif lane:
+            seen[lane] = pkg
+        blocking = blocked_by(cards, pkg)
+        if blocking:
+            fail("now-items", "PLAN.md", "%s is dispatched (`Branch: %s`) while %s blocks it; the "
+                 "card is answered (prompt 3) before the package leaves for a branch"
+                 % (pkg, fields["Branch"], ", ".join(blocking)))
+        names, _ = dependencies(stored.get(pkg, {}))
+        for dep in names:
+            status = rows.get(dep, (None, "no row"))[1]
+            if status != "done":
+                fail("now-items", "PLAN.md", "%s is dispatched (`Branch: %s`) and depends on %s, "
+                     "which is %s, not `done`" % (pkg, fields["Branch"], dep, status))
+    if wave:
+        ok("now-items", "wave of %d: %s" % (len(wave), ", ".join(p for p, _ in wave)))
+
+
 # --- task characteristics and the prompt-selection policy ---------------------
 #
 # The pack states DATA (what kind of task a package is); AGENTS.md states POLICY
@@ -1877,6 +1945,7 @@ def main():
     check_layer_notes(root, pkgs, rows)
     check_pending(root, pkgs, rows)
     check_task_policy(root, cards)
+    check_wave(root, rows, cards)
     events, chain_ok = check_log(root)
     makefile = os.path.join(root, "Makefile")
     check_markers(root, all_docs + ([makefile] if exists(makefile) else []))

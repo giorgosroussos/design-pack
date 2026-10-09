@@ -470,7 +470,8 @@ standard library, and it runs before any code exists.
 | Rule | Asserts |
 | --- | --- |
 | `citations` | every `NN` §M and `README.md` §Name citation resolves to a real heading (a §Name is the longest heading the text starts with, so prose may follow); the body of a superseded decision is history and is not checked |
-| `now-items` | no `Now` item is already `done`; every `Now` item has a traceability row |
+| `now-items` | no `Now` item is already `done`; every `Now` item has a traceability row; a `Lane:` on an item is the plan's; among the items with a `Branch:` (a dispatched wave), no two share a lane, none is blocked by an open card, none depends on a package not `done` |
+| `pending` | staged work is well-formed: events with exactly stream, type, actor and payload, placeholder IDs and never real ones, amendments with their six fields citing a staged spec-amendment; a `done` package has no staging file and no `## Landing` left |
 | `plan-size` | `PLAN.md` stays under its line ceiling |
 | `gaps` | every package or phase a gap cites exists; gap IDs unique and increasing |
 | `packages` | every work package has exactly one traceability row, and no row lacks a package |
