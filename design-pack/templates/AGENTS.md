@@ -168,6 +168,12 @@ The table says *whether* prompt 2 runs; `SESSION_BOOTSTRAP_PROMPT_SAMPLE.md` say
 review runs in a session that did not write the code, because the session that did holds the
 assumptions the review exists to catch.
 
+Expect prompt 2 on most packages. The characteristics are derived from whole cited sections, and
+in a real pack nearly every section carries a security or data statement and a red line: on the
+first pack built this way, 45 of 46 packages selected it. That is the table working as written,
+so the review is effectively always on. A package that should skip it says so through narrower
+citations in the plan, never through an edit to this table.
+
 ## Living documents
 
 All at repository root. When scope changes, update the smallest relevant document. Durable rationale goes to `DECISIONS.md`, incompleteness to `GAPS.md`, unresolved choices to `QUESTIONS.md`; `PLAN.md` never becomes an archive. `make check-docs` fails on the inconsistencies that can be detected mechanically; the rules below are the ones it cannot.

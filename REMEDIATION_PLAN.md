@@ -54,6 +54,7 @@ bash design-pack/scripts/test-land.sh
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
 | W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | done |
 | W11 | Parallel execution under an orchestrator | B — orchestration; 6 owner decisions | ~4 days | in progress |
+| W12 | Prompt 2's selection does not discriminate | C — measured, owner | ? | not started |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -1310,8 +1311,40 @@ change only if both conditions hold:
 - FND-, UI-only and docs-only packages stop selecting review;
 - every package that changed auth, storage or the protocol still selects it.
 
+Measured on 2026-10-09 against dnd-vtt at `20715aa`, read-only, from a `git archive` copy, with
+this repository's `check-docs.py` and a measurement script that computes both derivations side
+by side. Option A was computed as far as the pack's data allows: a package gets a statement's
+surface only when its citation names that statement's section or an ancestor of it, never the
+parent's sibling, and a red line hits only when the two citations are the same section or one
+contains the other.
+
+| | today's derivation | narrowed (A) |
+| --- | --- | --- |
+| packages selecting prompt 2 | 45 of 46 | 45 of 46 |
+| carrying all five surfaces | 15 | 15 |
+| `Touches red line: yes` | 32 | 32 |
+
+The narrowing changes nothing, because the widening it removes is not the cause. There are three
+causes:
+- The packages cite whole top-level sections, and those sections mix surfaces. UXR-04 ("Compact
+  campaigns menu") cites only `08` §14, and §14 carries data and scope statements.
+- 32 packages touch a red line, and the red lines cite sections just as broad.
+- 27 packages record `Contract change: yes`.
+
+Option A as the item states it ("the normative statements a package's acceptance criteria
+cite") has no data to run on. Only 14 packages have an `Exit:` line, only 2 of those cite a
+section, and only 1 package tags a card on its own lines. Without the red-line trigger, surfaces
+from the package's own card tags plus `Contract change` would still select 27. The acceptance
+test the item set for A fails: FND-02 (CI baseline), REL-02 (acceptance suite) and every UXR-
+UI package still select review.
+
+Decision: **B (owner, 2026-10-09)**. The derivation is unchanged, and `AGENTS.md` says under the
+table that prompt 2 is effectively always on and that the lever is narrower citations in the
+plan, never an edit to the table. Making the selection discriminate is W12, with this
+measurement as its starting point.
+
 Acceptance:
-- [ ] The measurement has been run on dnd-vtt and recorded here. The owner's decision is
+- [x] The measurement has been run on dnd-vtt and recorded here. The owner's decision is
       recorded in this item's `Decision:` line, and whichever derivation it names is the one
       `task-policy` holds.
 
@@ -1371,6 +1404,34 @@ repository runs it.
 3. W11.5 extends `log-land.py`, so it comes after W11.1.
 4. W11.6 is a measurement, then the owner's decision.
 5. W11.7 is independent.
+
+---
+
+## W12 — Prompt 2's selection does not discriminate (**owner**)
+
+Status: not started
+
+Source: the W11.6 measurement on dnd-vtt (recorded under W11.6). Prompt 2 is selected for 45 of
+46 packages, and narrowing `Surfaces` to statement level selects the same 45. Three things drive
+the selection, and the derivation fixes none of them:
+
+- **Citation granularity.** Packages cite whole top-level sections whose statements mix surfaces,
+  so a UI-only package (UXR-04 → `08` §14) derives data and scope.
+- **Red lines.** 32 packages touch one, because the red lines cite sections just as broad.
+- **`Contract change: yes`.** 27 packages record it. It is a judgement, so the derivation cannot
+  narrow it.
+
+The item is to find a rule under which FND-, UI-only and docs-only packages stop selecting
+review, while every package that changed auth, storage or the protocol still selects it, and to
+prove the rule on dnd-vtt with the same script. Candidates to measure, not yet decided:
+- Stage B cites subsections rather than top-level sections, with a `task-policy` note when a
+  package cites a top-level section that holds more than one surface.
+- Red lines cite statements rather than sections.
+- Review is selected by `security`/`data` together with `Touches red line`, rather than by either
+  alone.
+
+Each candidate is a change to what the owner's plan says, or to the policy table, so the choice
+is the owner's.
 
 ---
 

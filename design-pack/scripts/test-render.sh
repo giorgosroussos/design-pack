@@ -751,6 +751,12 @@ else
     report no "13c the 1o row" "AGENTS.md has no row for prompt 1o"
 fi
 
+if grep -q 'Expect prompt 2 on most packages' AGENTS.md && grep -q 'effectively always on' AGENTS.md; then
+    report ok "13d the table says that prompt 2 is effectively always on, as Q-W11.6 decided" ""
+else
+    report no "13d Q-W11.6" "AGENTS.md does not say it"
+fi
+
 # The ceilings are declared where the documents themselves are, not only in the checker.
 if grep -q 'gaps-size' GAPS.md && grep -q 'evidence-size' TRACEABILITY.md; then
     report ok "11c GAPS.md and TRACEABILITY.md state their own ceilings and why" ""
