@@ -190,6 +190,249 @@ def build(seq, ts, actor, stream, event_type, payload, prev):
     return ordered(record)
 
 
+# --- the one write path -------------------------------------------------------
+#
+# `log-append.py` (one session, straight to the log) and `log-land.py` (a
+# package's staged events, after it integrates) both write through the three
+# functions below, so there is one writer and one set of refusals: an event one
+# of them refuses, the other refuses too, with the same words.
+
+
+class DeadCitation(LogError):
+    """A decision whose text cites a section that an existing spec does not have."""
+
+    def __init__(self, dead):
+        LogError.__init__(self, "this decision cites a section that does not exist, and on an "
+                                "append-only log the text could never be fixed; refused.\n  %s"
+                                % "\n  ".join(dead))
+        self.dead = dead
+
+
+class Unprojectable(LogError):
+    """An event the stream's projection cannot fold."""
+
+
+def dead_citations(root, payload):
+    """Citations in a decision's text that point into an existing spec and miss.
+
+    Uses the gate's own parser (`check-docs.py`, beside this module); when that
+    file is absent there is nothing to check against and nothing is refused.
+    """
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-docs.py")
+    if not os.path.isfile(path):
+        return []
+    spec = importlib.util.spec_from_file_location("checkdocs", path)
+    checkdocs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checkdocs)
+    text = "\n".join(str(payload.get(k, "")) for k in ("decision", "why", "alternatives", "affected_specs"))
+    return checkdocs.citation_failures(root, text, existing_only=True)
+
+
+def admit(root, stream, event_type, payload):
+    """The payload as the log will store it, or LogError: the door every event passes.
+
+    Validation against the stream's own rules, then, for a decision, the citation
+    check. A DeadCitation is raised for the second, so a caller can tell the two
+    refusals apart without parsing a message.
+    """
+    out = validate(stream, event_type, payload)
+    if stream == DECISIONS_STREAM and event_type == "decision-added":
+        dead = dead_citations(root, out)
+        if dead:
+            raise DeadCitation(dead)
+    return out
+
+
+def chain_onto(records, events, ts):
+    """Build the records for `events` [(stream, type, actor, payload)] on top of `records`.
+
+    Every record is checked against the projection with all the ones before it,
+    so a batch is folded exactly as it will be read back. Raises Unprojectable
+    carrying the index of the first event that cannot be folded; nothing is
+    written here, which is what makes every caller all or nothing.
+    """
+    seq, prev = head(records)
+    pending, out = list(records), []
+    for i, (stream, event_type, actor, payload) in enumerate(events):
+        record = build(seq + 1 + i, ts, actor, stream, event_type, payload, prev)
+        try:
+            check_appendable(pending, record)
+        except LogError as exc:
+            err = Unprojectable(str(exc))
+            err.index = i
+            raise err
+        pending.append(record)
+        out.append(record)
+        prev = record["hash"]
+    return out
+
+
+def write_records(root, new_records):
+    """Append already-chained records. The only place a line reaches the log."""
+    path = log_path(root)
+    directory = os.path.dirname(path)
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    with open(path, "a", encoding="utf-8", newline="\n") as fh:
+        for record in new_records:
+            fh.write(dumps(record) + "\n")
+
+
+# --- staging: what a package writes instead of appending -------------------
+#
+# Under an orchestrator, several sessions build several packages at once, in
+# several worktrees. If each appended to the log, two branches would append from
+# the same last record and the merged chain would fork (two records with one
+# `seq` and one `prev`), and both would take the next ID, so two different
+# decisions would both be D-012. Git cannot resolve either: the log is
+# append-only, so there is nothing to resolve them to.
+#
+# So such a session stages instead. `.log/pending/<PACKAGE>.jsonl` holds the
+# events it would have appended, one JSON object per line with exactly the keys
+# `stream`, `type`, `actor` and `payload` and no `seq`, `prev` or `hash`: those
+# exist only once the event is in the chain. A record it adds names itself with
+# a placeholder numbered per package, `D-NEW-1` or `Q-NEW-1`, and so does any
+# event or text that refers to it. `log-land.py` turns the staging file into
+# records, one package at a time, after the package integrates; `check-docs`
+# (`pending`) holds the form in between.
+
+PENDING_DIR = os.path.join(LOG_DIR, "pending")
+STAGED_KEYS = ("stream", "type", "actor", "payload")
+PLACEHOLDER_RE = re.compile(r"\b([DQG])-NEW-([1-9]\d*)\b")
+PLACEHOLDER_ANY_RE = re.compile(r"\b[DQG]-NEW[-\w]*")
+STREAM_EVENTS = {DECISIONS_STREAM: DECISION_EVENTS, QUESTIONS_STREAM: CARD_EVENTS}
+# The event that brings an ID into being, per stream, and the letter of its IDs.
+ADDS = {(DECISIONS_STREAM, "decision-added"): "D", (QUESTIONS_STREAM, "card-opened"): "Q"}
+REAL_ID_RE = {"D": ID_RE, "Q": CARD_ID_RE}
+
+
+def pending_path(root, package, suffix=".jsonl"):
+    return os.path.join(root, PENDING_DIR, package + suffix)
+
+
+def strings_in(value):
+    """Every string inside a JSON value, depth first."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            for s in strings_in(v):
+                yield s
+    elif isinstance(value, list):
+        for v in value:
+            for s in strings_in(v):
+                yield s
+
+
+def substitute(value, mapping):
+    """`value` with every placeholder the mapping knows replaced, strings at any depth."""
+    if isinstance(value, str):
+        return PLACEHOLDER_RE.sub(lambda m: mapping.get(m.group(0), m.group(0)), value)
+    if isinstance(value, dict):
+        return dict((k, substitute(v, mapping)) for k, v in value.items())
+    if isinstance(value, list):
+        return [substitute(v, mapping) for v in value]
+    return value
+
+
+def read_jsonl(path):
+    """[(line number, object or None, error or None)] for every non-blank line."""
+    out = []
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    for lineno, raw in enumerate(text.split("\n"), 1):
+        if not raw.strip():
+            continue
+        try:
+            obj = json.loads(raw)
+        except ValueError as exc:
+            out.append((lineno, None, "not valid JSON: %s" % exc))
+            continue
+        if not isinstance(obj, dict):
+            out.append((lineno, None, "not a JSON object"))
+            continue
+        out.append((lineno, obj, None))
+    return out
+
+
+def staged_problems(lines):
+    """(line, message) for every way a staging file is not well-formed.
+
+    `lines` is what read_jsonl returns. The checks are the ones a staging file
+    can fail on its own, before any ID is known: the four keys and nothing
+    else, a stream and type the log knows, a placeholder rather than a real ID
+    on every record that adds one, every placeholder referred to defined in the
+    same file, and the payload valid for its stream once the placeholders stand
+    for IDs. The last is the same `validate` the log's door runs, so a staging
+    file that passes here fails at landing only on what depends on the log
+    itself (a citation, a card that was never opened).
+    """
+    problems, defined, events = [], {}, []
+    for lineno, obj, error in lines:
+        if error:
+            problems.append((lineno, error))
+            continue
+        extra = sorted(set(obj) - set(STAGED_KEYS))
+        missing = [k for k in STAGED_KEYS if k not in obj]
+        if extra:
+            problems.append((lineno, "carries %s; a staged event has only %s, because seq, prev "
+                                     "and hash exist once it is in the chain, and landing writes them"
+                             % (", ".join(extra), ", ".join(STAGED_KEYS))))
+        if missing:
+            problems.append((lineno, "lacks %s" % ", ".join(missing)))
+            continue
+        stream, event_type, actor, payload = (obj[k] for k in STAGED_KEYS)
+        if stream not in STREAM_EVENTS:
+            problems.append((lineno, "stream %r is not one of %s" % (stream, ", ".join(sorted(STREAM_EVENTS)))))
+            continue
+        if event_type not in STREAM_EVENTS[stream]:
+            problems.append((lineno, "unknown %s event %r; expected one of %s"
+                             % (stream, event_type, ", ".join(STREAM_EVENTS[stream]))))
+            continue
+        if actor not in ACTORS:
+            problems.append((lineno, "actor %r is not one of %s" % (actor, ", ".join(ACTORS))))
+        if not isinstance(payload, dict):
+            problems.append((lineno, "payload must be a JSON object"))
+            continue
+        for s in strings_in(payload):
+            for token in PLACEHOLDER_ANY_RE.findall(s):
+                if not PLACEHOLDER_RE.fullmatch(token):
+                    problems.append((lineno, "%r is not a placeholder; they are D-NEW-n, Q-NEW-n "
+                                             "and G-NEW-n, numbered from 1 per package" % token))
+        letter = ADDS.get((stream, event_type))
+        if letter:
+            new_id = str(payload.get("id", ""))
+            if REAL_ID_RE[letter].match(new_id):
+                problems.append((lineno, "%s assigns the real ID %s. A staging file never does: two "
+                                         "packages staged from one base would both take it. Write "
+                                         "%s-NEW-n; `make land` assigns the real one"
+                                 % (event_type, new_id, letter)))
+            elif not re.fullmatch(r"%s-NEW-[1-9]\d*" % letter, new_id):
+                problems.append((lineno, "%s needs an id of the form %s-NEW-n, got %r"
+                                 % (event_type, letter, new_id)))
+            elif new_id in defined:
+                problems.append((lineno, "%s is added twice (line %d)" % (new_id, defined[new_id])))
+            else:
+                defined[new_id] = lineno
+        events.append((lineno, stream, event_type, payload))
+    for lineno, _, _, payload in events:
+        for s in strings_in(payload):
+            for m in PLACEHOLDER_RE.finditer(s):
+                if m.group(1) in "DQ" and m.group(0) not in defined:
+                    problems.append((lineno, "%s is referred to and never added in this file"
+                                     % m.group(0)))
+    # Shape: with every placeholder standing for a well-formed ID, the payload
+    # must pass the log's own validation.
+    dummy = dict((p, "%s-%03d" % (p[0], 900 + i)) for i, p in enumerate(sorted(defined)))
+    for lineno, stream, event_type, payload in events:
+        try:
+            validate(stream, event_type, substitute(payload, dummy))
+        except LogError as exc:
+            problems.append((lineno, str(exc)))
+    return sorted(set(problems))
+
+
 # --- event validation --------------------------------------------------------
 
 def clean(value):

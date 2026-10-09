@@ -215,7 +215,9 @@ different mechanism. `.log/README.md` says exactly this, rather than overselling
 
 ### 4.5 Two properties that hold by construction
 
-- **`log-append.py` is the only sanctioned writer.** It refuses to append onto a chain that does
+- **One write path.** `log-append.py` (one session, straight to the log) and `log-land.py` (one
+  package's staged events, after it integrates) both write through the same three functions of
+  `eventlog.py`, so an event one refuses the other refuses too. The writer refuses to append onto a chain that does
   not verify, so a break is never buried under later records, and it refuses an event that the
   stream's projection could not fold. That second refusal matters because the log is append-only:
   an unprojectable event could never be taken back, and the projection would stay unbuildable.
@@ -545,12 +547,12 @@ what no script can check.
 | `stages/hunter.md` | the two fresh-agent prompts |
 | `templates/` | the rendered assets, each with its placeholder notes |
 | `templates/scripts/eventlog.py` | chain primitives, event validation, both projections |
-| `templates/scripts/log-append.py`, `verify-chain.py`, `rebuild-decisions.py`, `rebuild-questions.py` | the only writer, the chain check, the two rebuilds |
+| `templates/scripts/log-append.py`, `log-land.py`, `verify-chain.py`, `rebuild-decisions.py`, `rebuild-questions.py` | the two writers over one write path (one session; one landed package), the chain check, the two rebuilds |
 | `templates/scripts/check-docs.py`, `lock-guard.py`, `unlock.sh` | the gates and the ceremony, copied verbatim |
 | `templates/githooks/`, `templates/.doc-locks`, `templates/UNLOCKS.md`, `templates/log-README.md` | the enforcement layer's assets |
 | `templates/decisions-seed.json` | the five regime records a fresh log starts with |
 | `scripts/extract-normative.py`, `scripts/stage-detect.sh` | the mechanical passes |
-| `scripts/test-lock-guard.sh`, `test-decisions-log.sh`, `test-questions-log.sh` | the acceptance suites |
+| `scripts/test-lock-guard.sh`, `test-decisions-log.sh`, `test-questions-log.sh`, `test-land.sh` | the acceptance suites |
 
 ---
 

@@ -1,6 +1,6 @@
 # {{PRODUCT_NAME}} root command contract (AGENTS.md "Commands").
 #
-# `check-docs`, `check-locks`, `verify-chain`, the two `rebuild-*` targets,
+# `check-docs`, `check-locks`, `verify-chain`, the two `rebuild-*` targets, `land`,
 # `install-hooks` and `unlock` are real from the first commit. Every other target is delivered by
 # the work package named in its recipe and, until then, fails with that message
 # instead of passing: a missing gate and a passing gate must never look alike.
@@ -18,7 +18,7 @@ define not_yet
 	@echo "make $(1): not implemented yet. Delivered by work package $(2); see PLAN.md and specs/{{NN_PLAN}}-implementation-plan.md §3." >&2; exit 1
 endef
 
-.PHONY: help setup infra-up infra-status infra-down migrate dev test lint format format-check typecheck {{CONTRACT_DRIFT_TARGET}} build verify smoke audit scan-secrets check-docs check-locks verify-chain rebuild-decisions rebuild-questions install-hooks unlock brief clean-start
+.PHONY: help setup infra-up infra-status infra-down migrate dev test lint format format-check typecheck {{CONTRACT_DRIFT_TARGET}} build verify smoke audit scan-secrets check-docs check-locks verify-chain rebuild-decisions rebuild-questions land install-hooks unlock brief clean-start
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -81,6 +81,15 @@ rebuild-decisions: ## Render DECISIONS.md from the event log's decisions stream
 
 rebuild-questions: ## Render QUESTIONS.md from the event log's questions stream
 	python3 scripts/rebuild-questions.py
+
+# `land` is the one writer for the work a package staged under an orchestrator:
+# its events (.log/pending/<PACKAGE>.jsonl), its spec amendments and the
+# `## Landing` section of its layer note. One package at a time, after it
+# integrates; it appends through the same code as log-append.py, rebuilds both
+# projections, and changes nothing at all when it refuses.
+land: ## Land one package's staged events, amendments and document updates: land TASK=<PACKAGE>
+	@test -n "$(TASK)" || { echo 'usage: make land TASK=<PACKAGE>  (the package whose staged work integrates next)' >&2; exit 2; }
+	python3 scripts/log-land.py $(TASK)
 
 # `brief` is a reader, not a gate: it prints what a session working on one package
 # has to read, selected from the pack by what that package cites. It never writes

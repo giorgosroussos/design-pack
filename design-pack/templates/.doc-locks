@@ -57,6 +57,13 @@ free: specs/**
 append-only: .log/events.jsonl
 append-only: UNLOCKS.md
 
+# Staged work: what a package writes under an orchestrator instead of appending
+# (events, spec amendments), until `make land` turns it into records. It is
+# free because staging is mutable until it lands; the chain is what is
+# append-only, and nothing in here is in the chain yet. The glob does not
+# overlap `.log/events.jsonl`, so this line's position is not load-bearing.
+free: .log/pending/**
+
 # DECISIONS.md and QUESTIONS.md are free because they are generated, not
 # authored: each is the projection of a stream of the log. Free does not mean
 # unguarded. The `projection-fresh` rule of check-docs rebuilds both and compares

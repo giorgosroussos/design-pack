@@ -35,6 +35,8 @@ bash design-pack/scripts/test-check-docs.sh
 bash design-pack/scripts/test-render.sh
 bash design-pack/scripts/test-allowed-tools.sh
 bash design-pack/scripts/test-stage-detect.sh
+bash design-pack/scripts/test-task-policy.sh
+bash design-pack/scripts/test-land.sh
 ```
 
 ## Summary board
@@ -51,6 +53,7 @@ bash design-pack/scripts/test-stage-detect.sh
 | W8 | Findings of the live dry run (owner's session) | 1 owner decision | ½ day | in progress |
 | W9 | Loop prompts have no selection rule | B — orchestration | ½ day | done |
 | W10 | Session reading cost and the knowledge a run buys | B — run economics | ~3½ days | done |
+| W11 | Parallel execution under an orchestrator | B — orchestration; 6 owner decisions | ~4 days | in progress |
 
 Categories: **A** no design change, zero risk · **B** medium change, one design decision each ·
 **C** closes the gap between what the overview promises and what runs in the target · **docs** the
@@ -1034,6 +1037,340 @@ elicitation and says nothing about what a run costs. This item adds a second mea
 package** from the layer notes' dated Handoff sections. Both come from the pack itself, neither
 needs the owner, and if they do not fall after W10.1 and W10.2 land, this item did not work.
 On the exemplar's numbers the target is a session that opens on ~35 KB instead of ~1.46 MB.
+
+---
+
+## W11 — Parallel execution under an orchestrator
+
+Status: in progress
+Decision: the four owner questions asked up front were decided on 2026-10-09. **The owner
+accepted all four recommendations as written**: Q-W11.1, placeholders only in the staging file
+and the package's own layer note; Q-W11.2, Prompt 1 is aligned with 1o; Q-W11.3, `Depends on:`
+is stored in the plan; Q-W11.5, the owner runs one unlock per landed package. The work raised a
+fifth question, Q-W11.4. The wave checks hold only for `Now` items that carry a `Branch:`, and
+the owner decided it the same day (see W11.4). Q-W11.6 is measured before it is asked, as the
+item says.
+
+W9 told an orchestrator *which* prompts a package needs, and W10.5 told it *whether* two packages
+can run at once (`File surface:`, `Lane:`, and the overlaps `--task all` reports). Nothing yet
+covers what happens when they do. Prompt 1 assumes one session working on one `Now` item,
+writing directly to documents that every package shares. Run three of those sessions in three
+worktrees and they collide in four places:
+
+- **The event log.** Each session appends to `.log/events.jsonl` through `log-append.py`. Two
+  branches append from the same last record, so on merge the chain forks: two records with the
+  same `seq` and `prev`, and `verify-chain` fails. Separately, both sessions assign the next ID,
+  so two different decisions are both `D-012`. Git can resolve neither collision: the log is
+  append-only, so there is nothing to resolve them *to*.
+- **The projections and living documents.** Every package edits `DECISIONS.md`, `QUESTIONS.md`,
+  `TRACEABILITY.md`, `GAPS.md`, `PLAN.md` and the Layer-notes index in `AGENTS.md`, so every
+  merge conflicts.
+- **Dependencies within a phase.** The plan orders phases, and W10.5 orders lanes. Nothing states
+  that a package needs another package's outcome inside the same phase for a reason other than a
+  contract, so an orchestrator has to infer it, and an inference is a decision an agent made.
+- **Prompt 1's assumption clause.** "Otherwise state the assumption, tag it, and continue" lets
+  an implementation session decide a surface question itself whenever it judges the decision
+  cheap. That contradicts Stage A, where the skill never decides a surface question for the
+  owner. One session at least surfaces the assumption in its own handoff. Three parallel
+  sessions bury it in three handoffs.
+
+The design principle does not change: the pack states DATA and the orchestrator applies POLICY.
+Everything W11 adds falls into one of three kinds:
+
+- derived and verified;
+- a recorded judgement, checked for form;
+- live state.
+
+The event log stays the only source of truth for decisions and cards.
+
+### W11.1 — Staged events and `make land` (B)
+
+Files: `templates/scripts/log-land.py` (new), `templates/scripts/eventlog.py`,
+`templates/scripts/log-append.py`, `templates/scripts/check-docs.py`, `templates/Makefile`,
+`templates/.doc-locks`, `templates/log-README.md`, `templates/AGENTS.md` (Commands),
+`stages/C-operationalize.md` (the copy list), `scripts/test-land.sh` (new).
+
+1. **The staging file.** A session working on a package under an orchestrator never appends to
+   the log. It writes the events it would have appended to `.log/pending/<PACKAGE>.jsonl`, one
+   JSON object per line: `{"stream", "type", "actor", "payload"}`, with no `seq`, `prev` or
+   `hash`. IDs inside payloads are placeholders, numbered per package: `D-NEW-1`, `Q-NEW-1`, and
+   so on. `.doc-locks` gains `free: .log/pending/**` below the `append-only` line, with a comment
+   saying why it is free: staging stays mutable until it lands, and only the chain is
+   append-only.
+2. **Staged document updates.** The same session writes its updates to the shared documents in a
+   `## Landing` section of `docs/layers/<PACKAGE>.md`, one line per update, in a fixed form that
+   `log-land.py` can apply:
+   - in `TRACEABILITY.md`, the package row and its evidence;
+   - in `GAPS.md`, the rows to add, narrow or retire, with a new row carrying a `G-NEW-n`
+     placeholder, because two parallel packages would otherwise both add `G-012`;
+   - in `PLAN.md`, the item to remove.
+
+   The Layer-notes index line is not staged: it is derived from the note's title.
+3. **`make land TASK=<PACKAGE>`** runs `log-land.py`, which:
+   - validates every staged event with the same checks as `log-append.py`, before it writes
+     anything (all or nothing);
+   - assigns the next contiguous real IDs in staged order, and rewrites the placeholders in the
+     staged events and in `docs/layers/<PACKAGE>.md`;
+   - appends the events through the same code path as `log-append.py`, so there is one writer
+     and one set of refusals;
+   - rebuilds both projections and applies the `## Landing` updates;
+   - removes the staging file and the `## Landing` section;
+   - on any refusal, exits non-zero and changes nothing.
+4. **A new `check-docs` rule, `pending`:**
+   - every staged line is well-formed for its stream;
+   - placeholders follow `D-NEW-n` and `Q-NEW-n`, and no staging file assigns a real `D-` or
+     `Q-` ID;
+   - a package whose `TRACEABILITY.md` row is `done` has no staging file and no `## Landing`
+     section.
+5. **Landing order is the orchestrator's choice**: one package at a time, right after it
+   integrates. The pack guarantees only that landing is deterministic and refuses exactly what
+   `log-append.py` refuses.
+
+Q-W11.1 (owner): where may placeholders appear? Recommendation: **only in the staging file and
+in the package's own layer note.** Code comments and commit messages do not cite decision IDs
+before landing. A session that needs to refer to its own new decision in code waits for the
+landed ID and adds it in a follow-up commit. Otherwise `log-land.py` would have to rewrite
+source files, which is a different and riskier job. Decision: **staging file and layer note only
+(owner, 2026-10-09)**, the recommendation as written.
+
+Acceptance (`scripts/test-land.sh`, on a rendered pack):
+- [x] Two packages are staged on two branches from the same base, merged, then landed one after
+      the other. Then `verify-chain` passes, the IDs are contiguous, and each layer note cites
+      its own real IDs.
+- [x] A staged event that `log-append.py` would refuse (a dead citation, an unknown type) makes
+      `land` exit non-zero, and the log, the projections and the documents stay byte-identical.
+- [x] A staging file that carries a real `D-NNN` fails `pending`, and the failure names the
+      line.
+- [x] A `done` package with a leftover staging file fails `pending`.
+- [x] A pack that never stages anything (single-session use) passes `check-docs` unchanged.
+
+### W11.2 — Prompt 1o, and the assumption clause (B, **owner**)
+
+Files: `templates/SESSION_BOOTSTRAP_PROMPT_SAMPLE.md`, `templates/AGENTS.md` (Prompt selection),
+`templates/scripts/check-docs.py`, `scripts/test-task-policy.sh`, `scripts/test-render.sh`.
+
+Add **Prompt 1o — Implement (orchestrated)** beside Prompt 1, without editing Prompt 1's other
+text. Prompt 1o differs from Prompt 1 in exactly four ways:
+- It works on the package the orchestrator names, on the branch the orchestrator names, and only
+  inside the package's `File surface:`. If it needs anything outside the file surface, it stops
+  and reports.
+- It never runs `log-append.py`, `make rebuild-*` or `make land`, and it never edits the shared
+  documents. It stages events and document updates as W11.1 describes.
+- If a specification ambiguity touches data, security, scope, external commitments or UX, it
+  **stops** and reports the card it would open: the silent section, the options, their
+  consequences and a recommendation. It does not continue on an assumption.
+- It commits on its branch when the orchestrator's brief says so.
+
+The Prompt selection table gains one row: "Under an orchestrator, Prompt 1o replaces Prompt 1;
+prompts 2 and 3 are unchanged." `task-policy` already reads that table, so its list of accepted
+prompt names gains `1o`.
+
+Q-W11.2 (owner): should Prompt 1's own clause change too? It reads: "pause only if proceeding
+would make a costly or irreversible assumption. Otherwise state the assumption, tag it, and
+continue." That lets a session decide a surface question on its own judgement of cost, which
+Stage A never allows. Recommendation: **yes, align Prompt 1 with 1o.** An ambiguity that touches
+a surface becomes a card and the session stops. Anything that touches no surface stays a
+recorded `decision-added` and the session continues. The line between owner decisions and agent
+decisions is then the same at design time and at build time. The cost is that a single-agent
+session stops more often, and the owner-interventions metric exists to measure exactly that.
+Decision: **align Prompt 1 (owner, 2026-10-09)**, the recommendation as written.
+
+Acceptance:
+- [ ] Prompt 1o exists and the policy table names it. `task-policy` passes with it, and fails on
+      a misspelled prompt name.
+- [ ] Prompt 1o contains no instruction to write `.log/events.jsonl`, `DECISIONS.md`,
+      `QUESTIONS.md`, `TRACEABILITY.md`, `GAPS.md`, `PLAN.md` or `AGENTS.md`. This is a grep
+      test, like the existing prompt checks.
+- [ ] Per Q-W11.2, Prompt 1's assumption clause matches 1o's surface rule.
+
+### W11.3 — `Depends on:`, the sixth characteristic (B, **owner**)
+
+Files: `templates/specs/implementation-plan.md`, `templates/scripts/check-docs.py`,
+`stages/B-specify.md`, `scripts/test-task-policy.sh`, `scripts/test-render.sh`.
+
+1. Every package carries **`Depends on:`**: the package IDs that must be `done` before it
+   starts, or `—`. Phase order is already implied and is not repeated, so only dependencies
+   within the same phase are listed.
+2. **The field is partly derived.** Suppose package B cites a section that package A, in the
+   same phase and marked `Contract change: yes`, also cites. Then A must be listed in B's
+   `Depends on:`. `task-policy` recomputes these pairs and fails on a missing one, naming both
+   packages and the shared section. If both packages change a contract over the shared section,
+   one of them has to list the other: the rule cannot require both directions without requiring
+   a cycle.
+3. Any further dependency is the plan author's judgement, recorded in the same Stage B
+   `decision-added` as the lane assignment. `task-policy` checks that the listed IDs exist, are
+   in the same phase, and form no cycle.
+4. `--task` and `--brief` print the field, and `--task all` prints each phase's dependency order.
+
+Q-W11.3 (owner): should the field be stored in the plan, which the freeze hard-locks so that a
+correction needs a `make unlock`, or in `PLAN.md`, which is free? Recommendation: **in the
+plan**, for the reason Q-W10.5 was decided that way. A dependency is a property of the package,
+a wrong dependency is exactly the kind of correction that should leave a record, and the
+orchestrator must never compute an order that the pack can state. Decision: **in the plan
+(owner, 2026-10-09)**, the recommendation as written.
+
+Acceptance:
+- [ ] A consumer that cites a contract package's section without listing it fails, naming both
+      packages and the section.
+- [ ] A cycle fails, naming it. A dependency on a package in another phase fails with "phase
+      order already implies this".
+- [ ] `--brief` and `--task all` print the field, and `test-render.sh` proves that every rendered
+      package carries it.
+
+### W11.4 — `PLAN.md` holds a wave (A)
+
+Files: `templates/PLAN.md`, `templates/AGENTS.md` (Living documents),
+`templates/scripts/check-docs.py`, `scripts/test-check-docs.sh`.
+
+`PLAN.md` already allows 1–3 `Now` items. Under an orchestrator, each `Now` item gains two
+lines: **`Lane:`**, copied from the plan, and **`Branch:`**, written by the orchestrator, or `—`
+in single-session use. New `check-docs` checks:
+- no two `Now` items share a lane;
+- no `Now` item has a non-empty `blocked-by`;
+- no `Now` item depends (W11.3) on a package that is not `done`.
+
+Q-W11.4 (owner, raised by the work): which `Now` items do the three checks hold for? In W9's
+single-session flow, a `Now` item with an open card is the normal state: Prompt 3 runs, then
+Prompt 1. If every blocked `Now` item failed the gate, the session that writes the next package
+into `PLAN.md` would fail its own `make check-docs`. Recommendation: **only items that carry a
+`Branch:` other than `—`**, because a branch is what says the item is running beside the
+others. Decision: **only items with a `Branch:` (owner, 2026-10-09)**. A `Lane:` that is present
+is checked against the plan on every item, because a wrong copy is wrong in either mode.
+
+Acceptance:
+- [ ] Two dispatched `Now` items in one lane fail. A blocked package in `Now` fails. A `Now` item
+      with an unmet dependency fails.
+- [ ] A single `Now` item without `Branch:` (single-session use) passes.
+
+### W11.5 — Spec amendments under parallel work (B, **owner**)
+
+Files: `templates/scripts/log-land.py`, `templates/scripts/check-docs.py` (`pending`),
+`templates/scripts/unlock.sh`, `templates/Makefile`, `templates/AGENTS.md`,
+`scripts/test-land.sh`, `scripts/test-lock-guard.sh`.
+
+Evidence from the first real run (dnd-vtt, 2026-09-23 to 2026-10-07): 119 unlock ceremonies over
+46 packages, concentrated in four specs:
+
+| Spec | Unlock ceremonies |
+| --- | --- |
+| `08-ux-journeys` | 16 |
+| `04-live-sync` | 15 |
+| `13-implementation-plan` | 13 |
+| `11-traceability` | 11 |
+
+Amending spec text is the normal path of implementation, not an exception. Serially that is
+fine. In parallel, two packages that amend `08` in two worktrees each need their own unlock of
+the same path, and their edits conflict on merge, in a hard-locked file.
+
+The fix: amendments are staged the way events are (W11.1). A session writes them to
+`.log/pending/<PACKAGE>.amendments`, one JSON object per line:
+- the file and the section heading;
+- the exact old text and the new text;
+- the provenance tag;
+- the placeholder of the `spec-amendment` decision.
+
+`make land` applies them once each file they touch has been unlocked, one package at a time. It
+refuses any amendment whose old text is no longer present, because an earlier landing changed
+it; the session then re-derives the amendment.
+
+Q-W11.5 (owner): who runs the unlock at landing time? Recommendation: **the owner, once per
+landed package, covering every file that package amends.** That keeps the meaning of the
+ceremony, an owner's recorded reason, without one ceremony per hunk. It needs one small change:
+`unlock.sh` accepts several paths with one reason, and the token stays single-use, for one
+commit. Decision: **the owner, once per landed package (owner, 2026-10-09)**, the recommendation
+as written.
+
+Acceptance:
+- [ ] An amendment staged on a frozen pack is refused by `land` until the file is unlocked, and
+      the refusal names the `make unlock` to run. After `make unlock` of every path in one
+      command, the amendment lands, and the decision it cites is the landed ID.
+- [ ] An amendment whose old text an earlier landing changed is refused, and nothing is written.
+- [ ] `make unlock PATH="a b" REASON=...` records one line per path with the same reason and
+      authorizes both paths for one commit. A path that is not hard-locked refuses the whole
+      ceremony and records nothing.
+- [ ] `pending` fails an amendment line that lacks a field or names a decision the staging file
+      does not add.
+
+### W11.6 — `Surfaces` does not discriminate (C, **owner**)
+
+In the dnd-vtt pack, 45 of 46 packages get Prompt 2 from the policy table, and 20 carry all five
+surfaces. `Surfaces` is derived from **whole cited sections**, and nearly every section the plan
+cites carries at least one security or data statement. The characteristic therefore says "this
+package cites a big section", not "this package changes security or data". The table is
+working as written but selects almost everything, which is the opposite of W9's purpose: to skip
+the reviews that add nothing.
+
+Q-W11.6 (owner): narrow the derivation, or accept universal review? There are two options:
+- **A)** Derive `Surfaces` from the normative statements that the package's **acceptance
+  criteria** cite, not from whole sections.
+- **B)** Keep the derivation, and admit in `AGENTS.md` that Prompt 2 is effectively always on.
+
+Recommendation: **A**, but measured first. Run `--task all` both ways on dnd-vtt, and accept the
+change only if both conditions hold:
+- FND-, UI-only and docs-only packages stop selecting review;
+- every package that changed auth, storage or the protocol still selects it.
+
+Acceptance:
+- [ ] The measurement has been run on dnd-vtt and recorded here. The owner's decision is
+      recorded in this item's `Decision:` line, and whichever derivation it names is the one
+      `task-policy` holds.
+
+### W11.7 — Server-side lock enforcement on github.com (C)
+
+`.githooks/README.md` says that enforcement is `pre-receive` on the remote. That hook cannot be
+installed on github.com: custom pre-receive hooks exist only on GitHub Enterprise Server.
+dnd-vtt's remote is github.com, so its locks are enforced only locally.
+
+The fix has three parts:
+- FND-02's CI baseline gains a `check-locks` job. The job runs `lock-guard.py` over the pull
+  request's diff, judged by the base branch's `.doc-locks`, which is the same rule `pre-receive`
+  applies.
+- The README tells the owner to make that job a required status check.
+- The README's "Why both" section names CI as the server half wherever `pre-receive` is not
+  available.
+
+The worktree sentence from "Not in W11" lands in the same README: `core.hooksPath` is shared
+config, so the pre-commit guard runs in every worktree, but the read-only modes are per checkout,
+so the orchestrator runs `lock-guard.py --relock` in each worktree.
+
+Acceptance:
+- [ ] `make check-locks BASE=<rev>` judges the range from the merge base to `HEAD` with the
+      base's manifest. It refuses a locked change with no recorded reason, and accepts the same
+      change carrying its `UNLOCKS.md` record.
+- [ ] The rendered FND-02 names the job, and `.githooks/README.md` names CI as the server half
+      and carries the worktree sentence.
+
+### Migrating an existing pack to W10/W11
+
+dnd-vtt predates W10. It has no `File surface:`, no `Lane:`, no `make brief` and no
+`docs/layers/`. Before it runs under an orchestrator:
+
+1. Add the two fields, and W11.3's `Depends on:`, to every package in one `make unlock` of
+   `specs/13-implementation-plan.md`. Use the five lanes that its §8 already lists, with their
+   paths.
+2. Copy in the newer `check-docs.py`, `eventlog.py`, `log-append.py` and `log-land.py`, the new
+   `Makefile` targets and `docs/layers/README.md`.
+
+This is the cheapest way to make the existing pack schedulable without the orchestrator
+proposing anything. It is a change to the owner's pack, made by the owner. Nothing in this
+repository runs it.
+
+### Not in W11
+
+- **Wave sizes and wave membership** are the orchestrator's policy, approved by the owner per
+  wave. The pack states lanes, file surfaces, contracts and dependencies. It never stores a
+  schedule.
+- **Answering cards after the freeze** already works: `QUESTIONS.md` and `DECISIONS.md` are free
+  projections, cards move by events, and an answer given after the baseline goes into a
+  decision. No change is needed.
+
+### Order
+
+1. W11.1 first, because W11.2's prompt stages what W11.1 lands.
+2. W11.3 before W11.4, because the wave checks read `Depends on:`.
+3. W11.5 extends `log-land.py`, so it comes after W11.1.
+4. W11.6 is a measurement, then the owner's decision.
+5. W11.7 is independent.
 
 ---
 

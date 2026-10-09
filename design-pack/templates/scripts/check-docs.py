@@ -85,6 +85,13 @@ Rules
                 index; every note names a package the plan defines; and no
                 AGENTS.md heading names a work package, which is what keeps the
                 entry point an index of the layers rather than a copy of them
+  pending       the work a package staged under an orchestrator is well-formed:
+                every line of `.log/pending/<PACKAGE>.jsonl` is an event of a
+                known stream with exactly stream, type, actor and payload; every
+                record it adds carries a `D-NEW-n` / `Q-NEW-n` placeholder and
+                never a real ID; and a package
+                that TRACEABILITY.md calls `done` has no staging file and no
+                `## Landing` section left, because landing removes both
   commands      every `make <target>` listed in AGENTS.md "Commands" is a target
                 in the root Makefile
   agents-size   AGENTS.md stays under its byte ceiling
@@ -915,6 +922,59 @@ def check_layer_notes(root, pkgs, rows):
         len(done), len([n for n in os.listdir(layers)
                         if n.endswith(".md") and n != "README.md" and not n.startswith("_")])))
 
+# --- staged work ------------------------------------------------------------------
+#
+# Under an orchestrator a session stages its events and its updates
+#  to the shared documents instead of writing them (the staging section of
+# eventlog.py says why), and `make land` applies them after the package
+# integrates. This rule holds the form in between, so a staging file that could
+# never land fails the gate on the branch that wrote it, not on the day it lands.
+
+
+def load_eventlog():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import eventlog
+    except ImportError:
+        return None
+    return eventlog
+
+
+def check_pending(root, pkgs, rows):
+    done = set(p for p, (_, status, _) in rows.items() if status == "done")
+    pending = os.path.join(root, ".log", "pending")
+    files = 0
+    if os.path.isdir(pending):
+        eventlog = load_eventlog()
+        for name in sorted(os.listdir(pending)):
+            rel = "%s/%s" % (os.path.relpath(pending, root), name)
+            package, suffix = os.path.splitext(name)
+            if suffix != ".jsonl":
+                fail("pending", rel, "not a staging file; `.log/pending/` holds `<PACKAGE>.jsonl` "
+                     "only")
+                continue
+            files += 1
+            if pkgs and package not in pkgs:
+                fail("pending", rel, "names no work package in the implementation plan")
+            if package in done:
+                fail("pending", rel, "%s is `done` in TRACEABILITY.md and still has staged work; "
+                     "`make land TASK=%s` removes it when it lands" % (package, package))
+            if eventlog is None:
+                fail("pending", rel, "scripts/eventlog.py is missing; the staged form cannot be read")
+                continue
+            lines = eventlog.read_jsonl(os.path.join(pending, name))
+            problems = eventlog.staged_problems(lines)
+            for lineno, msg in problems:
+                fail("pending", "%s:%d" % (rel, lineno), msg)
+    for package in sorted(done):
+        note = layer_note_path(root, package)
+        if exists(note) and re.search(r"^##\s+Landing\s*$", read(note), re.M):
+            fail("pending", os.path.relpath(note, root),
+                 "%s is `done` and its note still carries `## Landing`; landing applies the "
+                 "section and removes it" % package)
+    ok("pending", "%d staging file(s)" % files)
+
+
 # --- task characteristics and the prompt-selection policy ---------------------
 #
 # The pack states DATA (what kind of task a package is); AGENTS.md states POLICY
@@ -1619,6 +1679,7 @@ def main():
     provisional = provisional_citations(root, specs, cards)
     check_agents(root)
     check_layer_notes(root, pkgs, rows)
+    check_pending(root, pkgs, rows)
     check_task_policy(root, cards)
     events, chain_ok = check_log(root)
     makefile = os.path.join(root, "Makefile")

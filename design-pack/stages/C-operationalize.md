@@ -48,8 +48,8 @@ so its form matters. Its statements are `[input]` by declaration. Before Step C1
    first run, and the owner's local permission grant (Stage A round A0) is theirs, not the
    pack's.
 3. Copy the log tooling, all unchanged: `templates/scripts/eventlog.py`, `log-append.py`,
-   `rebuild-decisions.py`, `rebuild-questions.py` and `verify-chain.py` to `<target>/scripts/`;
-   `chmod +x` the four tools. `eventlog.py` is a module rather than a tool: the three tools and `check-docs.py`
+   `log-land.py`, `rebuild-decisions.py`, `rebuild-questions.py` and `verify-chain.py` to
+   `<target>/scripts/`; `chmod +x` the five tools. `eventlog.py` is a module rather than a tool: the five tools and `check-docs.py`
    import it, so it has to sit beside them. Render `templates/log-README.md` into
    `<target>/.log/README.md`. If the target has no `.log/events.jsonl` — an adopted pack that
    never ran Stage B — create it empty and seed the five regime records exactly as

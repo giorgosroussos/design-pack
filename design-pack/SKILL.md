@@ -180,6 +180,7 @@ unacceptable state.
 | `templates/githooks/` | pre-commit, post-commit and the pre-receive mirror; transport only |
 | `templates/scripts/eventlog.py` | the event log: chain primitives, event validation, the decisions projection |
 | `templates/scripts/log-append.py`, `verify-chain.py` | the only sanctioned writer, and the chain check |
+| `templates/scripts/log-land.py` | what the pack's `land` target runs, never the skill: one package's staged events, amendments and landing lines, appended through the same writer, all or nothing |
 | `templates/scripts/rebuild-decisions.py`, `rebuild-questions.py` | the two projections, both thin over the shared renderer |
 | `templates/decisions-seed.json` | the five regime records Stage B appends to a fresh log |
 | `templates/claude-settings.local.json` | the skill's command patterns as a session-long permission grant, offered to the owner at the intake stop |
@@ -189,6 +190,7 @@ unacceptable state.
 | `scripts/test-lock-guard.sh`, `scripts/test-decisions-log.sh`, `scripts/test-questions-log.sh` | acceptance tests of the lock layer and of the two streams, each in a throwaway repository |
 | `scripts/test-check-docs.sh` | rule-level tests of `check-docs.py`, one minimal fixture per rule |
 | `scripts/test-task-policy.sh` | the `task-policy` rule and the `--task` reader over a fixture pack: derived characteristics, the policy table, and `blocked-by` as a live read |
+| `scripts/test-land.sh` | staged work on two branches of a rendered pack, merged and landed in turn: one chain, contiguous IDs, and a refusal that writes nothing |
 | `scripts/test-render.sh` | renders every template for a fixture product and proves the result passes the whole gate, the lock layer and `stage-detect` |
 | `scripts/test-allowed-tools.sh` | every shell command the stage files instruct matches a `Bash(...)` pattern of this file's `allowed-tools`, subcommand by subcommand |
 | `scripts/test-stage-detect.sh` | walks a target through every state and asserts `stage-detect` names each one |

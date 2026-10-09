@@ -32,6 +32,21 @@ A stream is a sequence of events about one thing. A projection is a file rendere
 
 Both streams share this one file and one contiguous `seq`; each projection folds only the records of its own stream. A projection is never authored. `make check-docs` renders both again and compares byte for byte (`projection-fresh`), so an edit made by hand in `DECISIONS.md` or `QUESTIONS.md` fails the gate instead of becoming the record. To change what a projection says, append an event.
 
+## Staged events: several sessions, one chain
+
+One session appends straight to this file. Several sessions building several packages at once, in several worktrees, cannot: two branches appending from the same last record fork the chain on merge (two records with one `seq` and one `prev`), and both take the next ID, so two different decisions are both `D-012`. Git can resolve neither, because there is nothing an append-only log can be resolved *to*.
+
+So a session working under an orchestrator stages instead, and never runs `log-append.py`, the `rebuild-*` targets or `make land`:
+
+| File | Holds |
+| --- | --- |
+| `.log/pending/<PACKAGE>.jsonl` | the events it would have appended: one JSON object per line with exactly `stream`, `type`, `actor` and `payload`, no `seq`, `prev` or `hash`. A record it adds is named by a placeholder numbered per package, `D-NEW-1`, `Q-NEW-1`, and anything that refers to it uses the same placeholder |
+| `## Landing` in `docs/layers/<PACKAGE>.md` | its updates to the shared documents, one bullet each: `traceability: <status> \| <evidence>`, `gap-add: G-NEW-n \| <gap> \| <consequence> \| <evidence to close> \| <plan item>`, `gap-narrow: G-NNN \| ...` (same cells), `gap-retire: G-NNN`, `plan-remove` |
+
+A placeholder appears only in those two places. Code and commit messages cite a decision by its real ID, in a commit after the landing.
+
+`make land TASK=<PACKAGE>` (`scripts/log-land.py`) runs once the package integrates, one package at a time, in the order the orchestrator chooses. It validates everything first, with the same checks `log-append.py` applies, then assigns the next contiguous real IDs in staged order, rewrites the placeholders in the events and the layer note, appends through the same code `log-append.py` uses, rebuilds both projections, applies the landing lines, adds the package's line to the `AGENTS.md` layer-notes index when it lands `done`, and removes the staging files and the `## Landing` section. On any refusal it exits non-zero having written nothing. `make check-docs` (`pending`) holds the staged form on the branch that wrote it, and fails a `done` package that still has staged work.
+
 ## What this guarantees, and what it does not
 
 **It guarantees**: any change to a record already in the log is detectable. Editing one character changes that record's hash, and every later record's `prev` stops matching, so `make verify-chain` names the first broken link. Removing a line is caught earlier still, by the append-only rule in `.doc-locks`, which the pre-commit and pre-receive hooks enforce.
@@ -44,6 +59,7 @@ Both streams share this one file and one contiguous `seq`; each projection folds
 make verify-chain        # recompute every hash and link, naming the first break
 make rebuild-decisions   # render DECISIONS.md from the log
 make rebuild-questions   # render QUESTIONS.md from the log
+make land TASK=<PKG>     # land one package's staged events, amendments and document updates
 make check-docs          # includes chain-intact and projection-fresh
 ```
 

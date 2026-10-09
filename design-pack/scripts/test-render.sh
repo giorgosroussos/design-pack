@@ -9,7 +9,10 @@
 # suite is test-check-docs.sh; this one proves the templates and the gate agree.
 #
 #   scripts/test-render.sh [--keep]
+#   scripts/test-render.sh --render-to DIR   render, seed and init the pack in DIR, run no case
 #
+# The second form is how another suite (test-land.sh) starts from the same pack
+# rather than from a second renderer that could drift from this one.
 # Exits non-zero if any case behaves wrong.
 set -u
 
@@ -17,7 +20,11 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 tpl="$here/templates"
 work="$(mktemp -d)"
 keep=""
-[ "${1:-}" = "--keep" ] && keep=1
+render_to=""
+case "${1:-}" in
+    --keep) keep=1 ;;
+    --render-to) render_to="${2:?usage: test-render.sh --render-to DIR}" ;;
+esac
 
 pass=0
 fail=0
@@ -36,6 +43,7 @@ cleanup() {
 trap cleanup EXIT
 
 repo="$work/repo"
+[ -n "$render_to" ] && repo="$render_to"
 mkdir -p "$repo"
 cd "$repo" || exit 2
 
@@ -52,10 +60,10 @@ install_hooks() {
 # --- Step C1: verbatim assets -------------------------------------------------
 
 mkdir -p scripts .githooks .log docs/inputs specs
-for f in check-docs.py lock-guard.py unlock.sh eventlog.py log-append.py rebuild-decisions.py rebuild-questions.py verify-chain.py; do
+for f in check-docs.py lock-guard.py unlock.sh eventlog.py log-append.py log-land.py rebuild-decisions.py rebuild-questions.py verify-chain.py; do
     cp "$tpl/scripts/$f" "scripts/$f"
 done
-chmod +x scripts/check-docs.py scripts/lock-guard.py scripts/unlock.sh scripts/log-append.py \
+chmod +x scripts/check-docs.py scripts/lock-guard.py scripts/unlock.sh scripts/log-append.py scripts/log-land.py \
          scripts/rebuild-decisions.py scripts/rebuild-questions.py scripts/verify-chain.py
 cp "$tpl/.doc-locks" .doc-locks
 for f in pre-commit post-commit pre-receive README.md; do cp "$tpl/githooks/$f" ".githooks/$f"; done
@@ -372,6 +380,8 @@ git config user.email "test@example.invalid"
 git config user.name "Render Test"
 git config commit.gpgsign false
 install_hooks >/dev/null 2>&1
+
+[ -n "$render_to" ] && exit 0
 
 printf 'render-and-check acceptance\n'
 

@@ -125,13 +125,14 @@ make check-locks    # lock manifest check of the staged change (scripts/lock-gua
 make verify-chain   # recompute every hash and link in .log/events.jsonl
 make rebuild-decisions  # render DECISIONS.md from the event log
 make rebuild-questions  # render QUESTIONS.md from the event log
+make land           # land one package's staged work, under an orchestrator: land TASK=<PACKAGE>
 make install-hooks  # point git at .githooks/ (once per clone)
-make unlock         # ceremonial unlock of one hard-locked path: PATH=<path> REASON="why"
+make unlock         # ceremonial unlock of hard-locked paths: PATH="<path> [<path> ...]" REASON="why"
 make brief          # everything a session on one package must read: brief TASK=<PACKAGE>
 make clean-start    # fresh isolated environment: setup, infra-up, migrate, verify, smoke, teardown
 ```
 
-`check-docs`, `check-locks`, `verify-chain`, the two `rebuild-*` targets, `install-hooks` and `unlock` are real from the first commit; the rest arrive with FND-01.
+`check-docs`, `check-locks`, `verify-chain`, the two `rebuild-*` targets, `land`, `install-hooks` and `unlock` are real from the first commit; the rest arrive with FND-01.
 
 CI (FND-02) runs on every merge request and every push to the default branch. Each job runs exactly one of the targets above, so a gate cannot pass in CI and fail locally; `README.md` maps job to command. Gates the testing specification requires that nothing implements yet run as failing-forward tripwires that pass only while the gate is provably absent (`{{NN_PLAN}}` §3).
 

@@ -38,7 +38,6 @@ Exit status: 0 appended, 2 usage or invalid event, 3 the chain does not verify.
 
 import argparse
 import datetime
-import importlib.util
 import json
 import os
 import sys
@@ -49,22 +48,6 @@ import eventlog  # noqa: E402
 
 def now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def dead_citations(root, payload):
-    """Citations in a decision's text that point into an existing spec and miss.
-
-    Uses the gate's own parser (`check-docs.py`, beside this script); when that
-    file is absent there is nothing to check against and nothing is refused.
-    """
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-docs.py")
-    if not os.path.isfile(path):
-        return []
-    spec = importlib.util.spec_from_file_location("checkdocs", path)
-    checkdocs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(checkdocs)
-    text = "\n".join(str(payload.get(k, "")) for k in ("decision", "why", "alternatives", "affected_specs"))
-    return checkdocs.citation_failures(root, text, existing_only=True)
 
 
 def main():
@@ -115,18 +98,10 @@ def main():
     validated = []
     for i, one in enumerate(payloads):
         try:
-            one = eventlog.validate(args.stream, args.event_type, one)
+            validated.append(eventlog.admit(root, args.stream, args.event_type, one))
         except eventlog.LogError as exc:
             sys.stderr.write("log-append: %s%s\n" % ("element %d: " % i if batch else "", exc))
             return 2
-        if args.stream == eventlog.DECISIONS_STREAM and args.event_type == "decision-added":
-            dead = dead_citations(root, one)
-            if dead:
-                sys.stderr.write("log-append: %sthis decision cites a section that does not exist, and on an "
-                                 "append-only log the text could never be fixed; refused.\n  %s\n"
-                                 % ("element %d: " % i if batch else "", "\n  ".join(dead)))
-                return 2
-        validated.append(one)
 
     path = eventlog.log_path(root)
     directory = os.path.dirname(path)
@@ -143,25 +118,15 @@ def main():
         return 3
 
     # Build and check every record before writing any: a batch is all or nothing.
-    seq, prev = eventlog.head(records)
-    pending, new_records = list(records), []
-    for i, one in enumerate(validated):
-        record = eventlog.build(seq + 1 + i, args.ts or now(), args.actor,
-                                args.stream, args.event_type, one, prev)
-        try:
-            eventlog.check_appendable(pending, record)
-        except eventlog.LogError as exc:
-            sys.stderr.write("log-append: %sthis event cannot be projected, so it is refused "
-                             "rather than appended to a log that nothing can take it out of.\n  %s\n"
-                             % ("element %d: " % i if batch else "", exc))
-            return 2
-        pending.append(record)
-        new_records.append(record)
-        prev = record["hash"]
-
-    with open(path, "a", encoding="utf-8", newline="\n") as fh:
-        for record in new_records:
-            fh.write(eventlog.dumps(record) + "\n")
+    events = [(args.stream, args.event_type, args.actor, one) for one in validated]
+    try:
+        new_records = eventlog.chain_onto(records, events, args.ts or now())
+    except eventlog.Unprojectable as exc:
+        sys.stderr.write("log-append: %sthis event cannot be projected, so it is refused "
+                         "rather than appended to a log that nothing can take it out of.\n  %s\n"
+                         % ("element %d: " % exc.index if batch else "", exc))
+        return 2
+    eventlog.write_records(root, new_records)
 
     if not args.quiet:
         for record in new_records:
