@@ -113,8 +113,8 @@ Mechanical pass after every round:
    command contract; FND-03 and FND-04 only when there is an API or a UI). Domain phases in
    dependency order, each with Goal, packages with stable IDs and outcome bullets, and Exit
    criteria a command or test demonstrates.
-   Then give every package its three characteristics, the data the loop's prompt-selection table
-   runs on (`templates/AGENTS.md` §Prompt selection):
+   Then give every package its six characteristics: the data the loop's prompt-selection table
+   runs on (`templates/AGENTS.md` §Prompt selection), and the data an orchestrator schedules by:
    - `python3 ${CLAUDE_SKILL_DIR}/templates/scripts/check-docs.py --root <target> --task all`
      prints, per package, the derived `Surfaces` and `Touches red line`. Copy both onto the
      package verbatim, one line each. They are derived from the sections the package cites, so
@@ -129,6 +129,14 @@ Mechanical pass after every round:
      they are recorded rather than asked: append one `decision-added` event (type
      `implementation`) naming the packages that are `yes`, the lane assignment and why, with the
      alternatives weighed, and rebuild the projection.
+   - Set `Depends on:` per package: the packages **of the same phase** that must be `done` before
+     it starts, or `—`. Phase order is already the plan's, so a package of another phase is never
+     listed. One pair is derived, not judged: a package citing a section that a
+     `Contract change: yes` package of its phase also cites depends on that package, and
+     `task-policy` names the pair if it is missing. Any further dependency is your judgement;
+     record it, with its reason, in the same `decision-added` as the lanes. An orchestrator
+     reads this field instead of inferring an order, and an inferred order is a decision an
+     agent made that nobody recorded.
    - **A package whose file surface spans more than one lane is a package to split**, at the seam
      the lanes already name, or to explain in that same decision. This is the only place the plan
      has a size at all: a package nobody can bound is a session nobody can finish, and the

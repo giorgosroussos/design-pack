@@ -57,10 +57,12 @@ rule exists because the alternative was measured: in the pre-skill exemplar this
 generalised from, 186 of that repository's 209 KB entry point were thirty-one sections, one per
 work package, read in full by every session forever.
 
-The same separation decides which of the three session prompts a task gets. The plan states DATA:
-every work package carries `Surfaces`, `Touches red line`, `Contract change`, `File surface` and
-`Lane` — the first two derived from the sections it cites and verified by `check-docs`, the last
-three the plan author's recorded judgements, checked for presence and shape and never recomputed.
+The same separation decides which of the session prompts a task gets. The plan states DATA:
+every work package carries `Surfaces`, `Touches red line`, `Contract change`, `File surface`,
+`Lane` and `Depends on` — the first two derived from the sections it cites and verified by
+`check-docs`, the next three the plan author's recorded judgements, checked for presence and shape
+and never recomputed, and the sixth the author's apart from one derived pair: a package citing a
+section that a `Contract change: yes` package of its phase also cites depends on it.
 `File surface` is what the playbook's task packet means by "files it may change"; `Lane` is one of
 the lanes the plan's own parallelization section lists, so two packages in different lanes can run
 beside each other and `--task all` reports any pair that shares a lane and a path. Without them a
@@ -488,7 +490,7 @@ standard library, and it runs before any code exists.
 | `evidence-size` | no Evidence cell of `TRACEABILITY.md` exceeds 1000 characters: it holds the run that proved the current status, and Git holds the earlier ones |
 | `layer-notes` | every `done` package has `docs/layers/<PACKAGE>.md` with its three headings and a line in the `AGENTS.md` index; every note names a package the plan defines; no `AGENTS.md` heading names a work package |
 | `markers` | no unrendered placeholder and no `TBD` survives |
-| `task-policy` | every work package states `Surfaces`, `Touches red line`, `Contract change`, `File surface` and `Lane`; the two derived ones equal what the pack derives from its own cards, register and red lines; the lane is one the plan lists; the prompt-selection table in `AGENTS.md` names only the three real prompts and only characteristics the rule defines |
+| `task-policy` | every work package states `Surfaces`, `Touches red line`, `Contract change`, `File surface`, `Lane` and `Depends on`; the two derived ones equal what the pack derives from its own cards, register and red lines; the lane is one the plan lists; `Depends on` stays inside the phase, forms no cycle, and lists every `Contract change: yes` package of the phase whose section the package cites; the prompt-selection table in `AGENTS.md` names only the four real prompts and only characteristics the rule defines |
 
 Targets that are real from the first commit: `check-docs`, `check-locks`, `verify-chain`,
 `rebuild-decisions`, `rebuild-questions`, `install-hooks`, `unlock`. Every other target in the

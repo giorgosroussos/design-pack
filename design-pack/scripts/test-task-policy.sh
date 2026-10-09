@@ -101,6 +101,7 @@ EOF
 - Contract change: no
 - File surface: app/access, tests/access
 - Lane: service
+- Depends on: —
 
 `PKG-02` Totals
 
@@ -110,6 +111,7 @@ EOF
 - Contract change: yes
 - File surface: app/totals, tests/totals
 - Lane: service
+- Depends on: —
 
 `PKG-03` Keeper access on one line — `01` §2.
 
@@ -118,6 +120,7 @@ EOF
 - Contract change: no
 - File surface: docs
 - Lane: tests and infrastructure
+- Depends on: —
 
 ## 5. Safe parallelization
 
@@ -349,8 +352,16 @@ else
 fi
 
 # the judgement itself is never recomputed: both values pass on the same package
+# (with every package a contract package, the two that share `01` §2 order themselves)
 fixture
 sed -i 's/^- Contract change: no$/- Contract change: yes/' specs/03-implementation-plan.md
+python3 - <<'PYEOF'
+import io
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+i = t.index("`PKG-03`")
+t = t[:i] + t[i:].replace("- Depends on: \u2014", "- Depends on: PKG-01", 1)
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
 if rule > "$work/9.out" 2>&1; then
     report ok "9 the recorded judgement is not recomputed: either boolean passes on the same package" ""
 else
@@ -429,6 +440,101 @@ if printf '%s' "$out" | grep -q 'Lane: service' && printf '%s' "$out" | grep -q 
     report ok "12g --brief carries the file surface and the lane: the packet's allowed scope" ""
 else
     report no "12g brief fields" "$(printf '%s' "$out" | head -8)"
+fi
+
+# --- 14: Depends on, partly derived from the contracts a phase changes -----------
+# PKG-01 and PKG-03 both cite `01` §2. Once PKG-01 changes a contract there, PKG-03
+# consumes it, and the pack can say so without anyone judging it.
+
+fixture
+sed -i '0,/^- Contract change: no$/s//- Contract change: yes/' specs/03-implementation-plan.md
+if rule > "$work/14.out" 2>&1; then
+    report no "14 a consumer that does not list the contract package" "no failure reported"
+elif grep -q 'PKG-03 cites `01` §2, which PKG-01 (`Contract change: yes`) also cites, and does not list PKG-01' "$work/14.out"; then
+    report ok "14 a consumer citing a contract package's section without listing it fails, naming both and the section" ""
+else
+    report no "14 derived dependency" "$(cat "$work/14.out")"
+fi
+python3 - <<'PYEOF'
+import io, re
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+i = t.index("`PKG-03`")
+t = t[:i] + t[i:].replace("- Depends on: —", "- Depends on: PKG-01", 1)
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/14b.out" 2>&1; then
+    report ok "14b listing the contract package satisfies the derived pair" ""
+else
+    report no "14b derived dependency satisfied" "$(cat "$work/14b.out")"
+fi
+out="$(python3 scripts/check-docs.py --task all 2>&1)"
+if printf '%s' "$out" | grep -q 'order: Phase 0: PKG-01, PKG-02 → PKG-03' \
+   && printf '%s' "$out" | grep -q '^PKG-03 .*Depends on: PKG-01'; then
+    report ok "14c --task all prints each package's Depends on and the phase's dependency order" ""
+else
+    report no "14c dependency order" "$out"
+fi
+if python3 scripts/check-docs.py --brief PKG-03 2>&1 | grep -q 'Depends on: PKG-01'; then
+    report ok "14d --brief carries Depends on in the characteristics it opens with" ""
+else
+    report no "14d brief" "no Depends on in the brief"
+fi
+
+# Two packages changing one contract: one has to go first, either one.
+sed -i 's/^- Contract change: no$/- Contract change: yes/; s/^- Depends on: PKG-01$/- Depends on: —/' specs/03-implementation-plan.md
+if rule > "$work/14e.out" 2>&1; then
+    report no "14e two contract packages over one section" "no failure reported"
+elif grep -q 'PKG-01 and PKG-03 both change a contract over `01` §2; one of them lists the other' "$work/14e.out"; then
+    report ok "14e two packages changing a contract over one section fail until one lists the other" ""
+else
+    report no "14e two contracts" "$(cat "$work/14e.out")"
+fi
+
+fixture
+python3 - <<'PYEOF'
+import io
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+t = t.replace("- Lane: service\n- Depends on: —", "- Lane: service\n- Depends on: PKG-02", 1)
+i = t.index("`PKG-02`")
+t = t[:i] + t[i:].replace("- Depends on: —", "- Depends on: PKG-01", 1)
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/15.out" 2>&1; then
+    report no "15 a dependency cycle" "no failure reported"
+elif grep -q 'forms a cycle, PKG-01 → PKG-02 → PKG-01' "$work/15.out"; then
+    report ok "15 a cycle fails, naming it" ""
+else
+    report no "15 cycle" "$(cat "$work/15.out")"
+fi
+
+fixture
+python3 - <<'PYEOF'
+import io
+t = io.open("specs/03-implementation-plan.md", encoding="utf-8").read()
+t = t.replace("## 5. Safe parallelization", """## 4. Phase 1 — Reports
+
+### Work packages
+
+`PKG-04` Monthly report
+
+- A report over the totals.
+- Surfaces: —
+- Touches red line: no
+- Contract change: no
+- File surface: app/reports
+- Lane: service
+- Depends on: PKG-02, notes
+
+## 5. Safe parallelization""")
+io.open("specs/03-implementation-plan.md", "w", encoding="utf-8", newline="\n").write(t)
+PYEOF
+if rule > "$work/15b.out" 2>&1; then
+    report no "15b a dependency on another phase" "no failure reported"
+elif grep -q 'PKG-04 (Phase 1) depends on PKG-02 (Phase 0); phase order already implies this' "$work/15b.out" \
+     && grep -q "PKG-04 has \`Depends on:\` 'notes', which is not a package ID" "$work/15b.out"; then
+    report ok "15b a dependency on another phase's package fails with \"phase order already implies this\"; a value that is no ID fails" ""
+else
+    report no "15b cross-phase" "$(cat "$work/15b.out")"
 fi
 
 # --- 11: --brief selects the pack, in order, and never writes -------------------

@@ -6,9 +6,9 @@ remaining packages contiguous (FND-01, FND-02, FND-03).
 Domain phases: one section per phase, in dependency order, each with Goal, Work packages
 (stable IDs `AAA-NN`, three-letter prefix per phase, bullets = outcomes, not tasks) and Exit
 criteria that a test or a command can demonstrate. Every package gets a TRACEABILITY.md row.
-Every package ALSO ends with its five characteristics, one per line. The first three are what the
-prompt-selection table in AGENTS.md reads; the last two are what a plan needs in order to be split
-at Stage B and scheduled in lanes afterwards:
+Every package ALSO ends with its six characteristics, one per line. The first three are what the
+prompt-selection table in AGENTS.md reads; the last three are what a plan needs in order to be split
+at Stage B and scheduled in lanes and in order afterwards:
   - Surfaces:            the surfaces the sections this package cites resolve to, in the order
                          data, security, scope, external, ux; an empty set is written as a dash.
                          DERIVED, never judged: a `[Q-NNN]` statement contributes its card's
@@ -31,16 +31,25 @@ at Stage B and scheduled in lanes afterwards:
                          A JUDGEMENT checked against that list: a lane nobody defined is a package
                          nobody can schedule. `--task all` reports packages that share a lane and
                          a path, because two of those are not two lanes.
+  - Depends on:          the package IDs of the SAME phase that must be `done` before this one
+                         starts, comma-separated, or a dash. Phase order is implied and never
+                         repeated: a package of another phase fails `task-policy`. PARTLY DERIVED:
+                         a package citing a section that a `Contract change: yes` package of its
+                         phase also cites lists that package, and `task-policy` fails a missing
+                         pair, naming both and the section. Anything more is the plan author's
+                         JUDGEMENT, recorded in the same decision as the lanes; it is checked for
+                         existence, phase and cycles. `--task all` prints each phase's order.
 Do not write the first two by hand: `python3 scripts/check-docs.py --task all` prints the derived
 pair for every package, and the `task-policy` rule fails the build when a stored value and the
-pack disagree. The last three are written by the plan author and never recomputed. There is no
-sixth field: `blocked-by` is read from QUESTIONS.md at run time, so a card can be resolved without
-unlocking this file.
+pack disagree. The next three are written by the plan author and never recomputed, and the sixth
+is the author's apart from the contract pairs the gate derives. There is no seventh field:
+`blocked-by` is read from QUESTIONS.md at run time, so a card can be resolved without unlocking
+this file.
 Placeholders:
   {{FND01_CHARACTERISTICS}} {{FND02_CHARACTERISTICS}} {{FND03_CHARACTERISTICS}} {{FND04_CHARACTERISTICS}}
-                           the three lines for each Phase 0 package (FND-03/FND-04 only when their
-                           conditional block is kept). Domain packages carry their own three lines
-                           inside {{DOMAIN_PHASES}}.
+                           the six lines for each Phase 0 package (FND-03/FND-04 only when their
+                           conditional block is kept); FND-02 depends on FND-01, whose targets it
+                           runs. Domain packages carry their own six lines inside {{DOMAIN_PHASES}}.
 Placeholders:
   {{DEPENDENCY_GRAPH}}     mermaid flowchart of phases
   {{STACK_SCAFFOLD_BULLET}} what FND-01 scaffolds ("Create the API app, the two SPAs, ..."), from the architecture spec
@@ -118,7 +127,7 @@ A fresh clone boots locally through `make clean-start`; CI is green on the remot
 
 After a phase's shared model and contracts are merged, agents may work concurrently on low-overlap packages. Never parallelize migrations for the same aggregate, or concurrent edits to central policies or the contract root, without explicit ownership.
 
-Every work package names one of the lanes below and the file surface it may change, so this section is schedulable rather than advisory: two packages in different lanes run beside each other, and `python3 scripts/check-docs.py --task all` reports any pair that shares a lane and a path. [input]
+Every work package names one of the lanes below, the file surface it may change and the packages of its phase it depends on, so this section is schedulable rather than advisory: two packages in different lanes whose dependencies are `done` run beside each other, and `python3 scripts/check-docs.py --task all` prints each phase's dependency order and reports any pair that shares a lane and a path. [input]
 
 Suggested maximum lanes:
 

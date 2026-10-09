@@ -1210,11 +1210,11 @@ orchestrator must never compute an order that the pack can state. Decision: **in
 (owner, 2026-10-09)**, the recommendation as written.
 
 Acceptance:
-- [ ] A consumer that cites a contract package's section without listing it fails, naming both
+- [x] A consumer that cites a contract package's section without listing it fails, naming both
       packages and the section.
-- [ ] A cycle fails, naming it. A dependency on a package in another phase fails with "phase
+- [x] A cycle fails, naming it. A dependency on a package in another phase fails with "phase
       order already implies this".
-- [ ] `--brief` and `--task all` print the field, and `test-render.sh` proves that every rendered
+- [x] `--brief` and `--task all` print the field, and `test-render.sh` proves that every rendered
       package carries it.
 
 ### W11.4 — `PLAN.md` holds a wave (A)

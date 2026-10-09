@@ -98,9 +98,12 @@ Rules
   markers       no unrendered `{{...}}` placeholder or `TBD` remains in the
                 documents or in the root Makefile
   task-policy   every work package states `Surfaces:`, `Touches red line:`,
-                `Contract change:`, `File surface:` and `Lane:`, the last two
-                judgements like the third, checked for presence and for a lane
-                the plan's own list defines; the two derived ones equal what the pack
+                `Contract change:`, `File surface:`, `Lane:` and `Depends on:`,
+                the third to fifth judgements, checked for presence and for a
+                lane the plan's own list defines; `Depends on:` names packages
+                of the same phase only, with no cycle, and it is partly derived:
+                a package citing a section that a `Contract change: yes` package
+                of its phase also cites lists that package; the two derived ones equal what the pack
                 itself says (the surfaces of the cards and register bullets the
                 package's cited sections resolve to, and whether a red line
                 cites a section the package cites); and the prompt-selection
@@ -142,7 +145,8 @@ STATUSES = {"not started", "in progress", "done"}
 DECISION_TYPES = {"implementation", "spec-amendment", "adr"}
 CARD_FIELDS = ["Surface", "Source", "Question", "Options", "Recommendation", "Blocks"]
 SURFACE_ORDER = ["data", "security", "scope", "external", "ux"]
-TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change", "File surface", "Lane"]
+TASK_FIELDS = ["Surfaces", "Touches red line", "Contract change", "File surface", "Lane",
+               "Depends on"]
 DERIVED_FIELDS = ["Surfaces", "Touches red line"]
 BOOLEAN_FIELDS = ["Touches red line", "Contract change"]
 LANE_HEADING = "Safe parallelization"
@@ -1283,6 +1287,181 @@ def report_lane_overlaps(root, packages, sink=None):
                         sink.append("note: " + line)
 
 
+def plan_package_phases(root):
+    """{package: phase number} from the `## N. Phase X` section each package sits in."""
+    plan = spec_by_role(root, "implementation-plan")
+    if not plan:
+        return {}
+    out, phase = {}, None
+    for line in strip_fences(read(plan)).splitlines():
+        hm = re.match(r"^##\s+(.*)$", line)
+        if hm:
+            pm = re.match(r"^\d+\.\s+Phase (\d+)", hm.group(1))
+            phase = pm.group(1) if pm else None
+            continue
+        m = re.match(r"^`([A-Z]{2,5}-\d{2,3})`\s", line)
+        if m and phase is not None:
+            out[m.group(1)] = phase
+    return out
+
+
+def dependencies(stored):
+    """(package IDs `Depends on:` names, the tokens that are not package IDs)."""
+    value = (stored.get("Depends on") or [""])[0].strip()
+    if value in ("", EMPTY, "-", "none"):
+        return [], []
+    names, bad = [], []
+    for token in [p.strip().strip("`") for p in value.split(",") if p.strip()]:
+        (names if re.fullmatch(r"[A-Z]{2,5}-\d{2,3}", token) else bad).append(token)
+    return names, bad
+
+
+def shared_sections(a, b):
+    """Citations two packages share: the same section, or one inside the other."""
+    out = set()
+    for nn, sec in a:
+        for nn2, sec2 in b:
+            if nn != nn2:
+                continue
+            if sec == sec2 or is_descendant(sec2, sec):
+                out.add((nn, sec))
+            elif is_descendant(sec, sec2):
+                out.add((nn, sec2))
+    return sorted(out)
+
+
+def dependency_graph(root, packages):
+    """{package: [same-phase dependencies]}, the edges `check_dependencies` accepts."""
+    phases = plan_package_phases(root)
+    graph = {}
+    for pkg, _, block in packages:
+        names, _ = dependencies(stored_characteristics(block))
+        graph[pkg] = [d for d in names if d != pkg and phases.get(d) is not None
+                      and phases.get(d) == phases.get(pkg)]
+    return graph
+
+
+def find_cycle(graph):
+    """One cycle as a list of packages, first repeated last, or None."""
+    state, stack = {}, []
+
+    def visit(node):
+        state[node] = "open"
+        stack.append(node)
+        for nxt in graph.get(node, []):
+            if state.get(nxt) == "open":
+                return stack[stack.index(nxt):] + [nxt]
+            if nxt not in state:
+                found = visit(nxt)
+                if found:
+                    return found
+        stack.pop()
+        state[node] = "closed"
+        return None
+
+    for node in sorted(graph):
+        if node not in state:
+            found = visit(node)
+            if found:
+                return found
+    return None
+
+
+def check_dependencies(root, packages, rel):
+    """`Depends on:`: inside the phase, acyclic, and never missing a contract it consumes.
+
+    Phase order is already the plan's, so a dependency on another phase's package
+    says nothing the plan does not, and is refused rather than kept as noise. The
+    one dependency the pack can derive is a contract: a package citing a section
+    that a `Contract change: yes` package of its phase also cites consumes that
+    contract, and starts after it. Everything else listed is the plan author's
+    judgement, recorded with the lanes, and checked for form only.
+    """
+    phases = plan_package_phases(root)
+    lines = dict((pkg, ln) for pkg, ln, _ in packages)
+    stored = dict((pkg, stored_characteristics(block)) for pkg, _, block in packages)
+    cites = dict((pkg, text_citations(block)) for pkg, _, block in packages)
+    deps = {}
+    for pkg, ln, _ in packages:
+        where = "%s:%d" % (rel, ln)
+        if not stored[pkg].get("Depends on"):
+            continue                 # the presence check has already said so
+        names, bad = dependencies(stored[pkg])
+        deps[pkg] = set(names)
+        for token in bad:
+            fail("task-policy", where, "%s has `Depends on:` %r, which is not a package ID; the "
+                 "value is package IDs, comma-separated, or `%s`" % (pkg, token, EMPTY))
+        for dep in names:
+            if dep == pkg:
+                fail("task-policy", where, "%s depends on itself" % pkg)
+            elif dep not in lines:
+                fail("task-policy", where, "%s depends on %s, which is not a work package in the "
+                     "plan" % (pkg, dep))
+            elif phases.get(dep) != phases.get(pkg):
+                fail("task-policy", where, "%s (Phase %s) depends on %s (Phase %s); phase order "
+                     "already implies this, and `Depends on:` lists only packages of the same "
+                     "phase" % (pkg, phases.get(pkg), dep, phases.get(dep)))
+    cycle = find_cycle(dependency_graph(root, packages))
+    if cycle:
+        fail("task-policy", "%s:%d" % (rel, lines[cycle[0]]),
+             "`Depends on:` forms a cycle, %s: none of them can start first"
+             % " \u2192 ".join(cycle))
+
+    def contract(pkg):
+        return (stored[pkg].get("Contract change") or [""])[0] == "yes"
+
+    seen = set()
+    for a, _, _ in packages:
+        if not contract(a):
+            continue
+        for b, ln, _ in packages:
+            if b == a or phases.get(a) is None or phases.get(a) != phases.get(b):
+                continue
+            if b not in deps:
+                continue             # no `Depends on:` at all: the presence check said so
+            shared = shared_sections(cites[a], cites[b])
+            if not shared:
+                continue
+            where = "%s:%d" % (rel, ln)
+            sections = ", ".join("`%s` \u00a7%s" % s for s in shared)
+            if contract(b):
+                pair = tuple(sorted((a, b)))
+                if pair in seen:
+                    continue
+                seen.add(pair)
+                if a not in deps.get(b, set()) and b not in deps.get(a, set()):
+                    fail("task-policy", where, "%s and %s both change a contract over %s; one of "
+                         "them lists the other in `Depends on:`, because two packages changing "
+                         "one contract at once is the parallel edit the plan forbids"
+                         % (pair[0], pair[1], sections))
+            elif a not in deps.get(b, set()):
+                fail("task-policy", where, "%s cites %s, which %s (`Contract change: yes`) also "
+                     "cites, and does not list %s in `Depends on:`. A package that consumes a "
+                     "contract starts after the package that changes it; this pair is derived, "
+                     "not judged" % (b, sections, a, a))
+
+
+def dependency_order(root, packages):
+    """{phase: [[packages that can start first], [then these], ...]} or None on a cycle."""
+    graph = dependency_graph(root, packages)
+    if find_cycle(graph):
+        return None
+    phases = plan_package_phases(root)
+    order = {}
+    for pkg, _, _ in packages:
+        order.setdefault(phases.get(pkg), [])
+    for phase in order:
+        members = [p for p, _, _ in packages if phases.get(p) == phase]
+        placed, levels = set(), []
+        while len(placed) < len(members):
+            level = [p for p in members if p not in placed
+                     and all(d in placed for d in graph.get(p, []))]
+            levels.append(level)
+            placed.update(level)
+        order[phase] = levels
+    return order
+
+
 def check_task_policy(root, cards):
     derived = derive_characteristics(root, cards)
     plan = spec_by_role(root, "implementation-plan")
@@ -1298,11 +1477,16 @@ def check_task_policy(root, cards):
         for field in TASK_FIELDS:
             values = stored.get(field, [])
             if not values:
-                why = ("cannot be matched against the prompt-selection table in AGENTS.md"
-                       if field in ("Surfaces", "Touches red line", "Contract change")
-                       else "cannot be bounded or scheduled: `File surface:` is what the "
-                            "playbook's task packet hands an agent, and `Lane:` is what says "
-                            "whether two packages may run at once")
+                if field in ("Surfaces", "Touches red line", "Contract change"):
+                    why = "cannot be matched against the prompt-selection table in AGENTS.md"
+                elif field == "Depends on":
+                    why = ("cannot be ordered inside its phase: `Depends on:` names the packages "
+                           "of the same phase that are `done` before it starts, or `%s`, so an "
+                           "orchestrator never has to infer an order the pack can state" % EMPTY)
+                else:
+                    why = ("cannot be bounded or scheduled: `File surface:` is what the "
+                           "playbook's task packet hands an agent, and `Lane:` is what says "
+                           "whether two packages may run at once")
                 fail("task-policy", where, "%s states no `%s:`; a package without it %s"
                      % (pkg, field, why))
             elif len(values) > 1:
@@ -1341,6 +1525,7 @@ def check_task_policy(root, cards):
                 fail("task-policy", where, "%s states `%s: %s`, but the pack derives `%s`: %s. "
                      "This characteristic is derived, not judged: correct the field, or the "
                      "citation that no longer holds" % (pkg, field, value, expected[field], detail))
+    check_dependencies(root, packages, rel)
     ok("task-policy", "%d work package(s) carry their characteristics, %d lane(s)"
        % (len(packages), len(lanes)))
     report_lane_overlaps(root, packages)
@@ -1368,18 +1553,28 @@ def report_tasks(root, cards, selector, sink=None):
         contract = (stored.get("Contract change") or [EMPTY])[0] or EMPTY
         lane = (stored.get("Lane") or [EMPTY])[0] or EMPTY
         surface = (stored.get("File surface") or [EMPTY])[0] or EMPTY
+        depends = (stored.get("Depends on") or [EMPTY])[0] or EMPTY
         cards_blocking = blocked_by(cards, pkg)
         line = ("%-10s Surfaces: %-34s Touches red line: %-4s Contract change: %-4s %s: %-10s "
-                "Lane: %-24s File surface: %s"
+                "Depends on: %-16s Lane: %-24s File surface: %s"
                 % (pkg, derived[pkg]["Surfaces"], derived[pkg]["Touches red line"], contract,
-                   LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY, lane, surface))
+                   LIVE_CHARACTERISTIC, ", ".join(cards_blocking) or EMPTY, depends, lane, surface))
         if sink is None:
             print(line)
         else:
             sink.append(line)
     if selector == "all":
-        # What an orchestrator choosing lanes needs before it starts two at once.
+        # What an orchestrator choosing lanes needs before it starts two at once:
+        # the order `Depends on:` imposes inside each phase, then the overlaps.
         overlaps = []
+        order = dependency_order(root, plan_package_blocks(root))
+        if order is None:
+            overlaps.append("order: `Depends on:` forms a cycle; `make check-docs` names it")
+        else:
+            for phase in sorted(order, key=lambda p: (p is None, int(p) if p else 0)):
+                overlaps.append("order: Phase %s: %s" % (
+                    phase if phase is not None else "?",
+                    " \u2192 ".join(", ".join(level) for level in order[phase])))
         report_lane_overlaps(root, plan_package_blocks(root), sink=overlaps)
         for line in overlaps:
             if sink is None:

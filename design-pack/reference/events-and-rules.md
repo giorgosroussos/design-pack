@@ -72,7 +72,7 @@ failures of other rules it dropped, so it never looks like a clean one.
 | `layer-notes` | a `done` package has no layer note or no index line, a note names no package, or an `AGENTS.md` heading names a package |
 | `pending` | a staged event is not well-formed for its stream, a staging file assigns a real `D-`/`Q-` ID, or a `done` package still has staged work |
 | `markers` | an unrendered `{{...}}` or a `TBD` survives |
-| `task-policy` | a package lacks one of its five characteristics, a derived one disagrees with the pack, a lane is not one the plan lists, or the prompt-selection table names something that is not a prompt or a characteristic |
+| `task-policy` | a package lacks one of its six characteristics, a derived one disagrees with the pack, a lane is not one the plan lists, a `Depends on:` crosses a phase, forms a cycle or misses a contract package whose section it cites, or the prompt-selection table names something that is not a prompt or a characteristic |
 
 Two readers run instead of the rules and never judge the pack: `--task PACKAGE|all`
 prints the characteristics and the live `blocked-by`, and `--brief PACKAGE`
